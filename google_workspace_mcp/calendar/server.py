@@ -1,8 +1,11 @@
 """Google Calendar MCP server: events, calendars, availability."""
 from __future__ import annotations
 
+import datetime
+
 from ..contacts.tools import register_contacts_tools
 from ..core import build_server, get_api, ok, register, run_tool
+from ..core.fanout import fan_out, merged, tag
 from .changes_api import CalendarChangesAPI
 
 mcp = build_server(
@@ -80,6 +83,49 @@ def list_events(
     )
     return ok(resolved, page["items"], next_page_token=page.get("nextPageToken"))
 
+
+
+def _start_key(event: dict) -> datetime.datetime:
+    """Sortable start time: timed events by instant, all-day events at 00:00 UTC."""
+    start = event.get("start") or {}
+    raw = start.get("dateTime") or start.get("date")
+    if not raw:
+        return datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
+    try:
+        when = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.datetime.max.replace(tzinfo=datetime.timezone.utc)
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    return when
+
+
+@register(mcp)
+def list_events_all_accounts(
+    accounts: list[str] | None = None,
+    *,
+    time_min: str,
+    time_max: str,
+    max_results_per_account: int = 25,
+) -> dict:
+    """List events from every account's primary calendar (or only `accounts`) as one agenda.
+
+    time_min/time_max are RFC3339. Events are sorted by start time and each
+    carries an `account` key. An account that fails is listed under `errors`.
+    """
+    results, errors = fan_out(
+        "calendar",
+        CalendarChangesAPI,
+        accounts,
+        lambda api: api.list_events_page(
+            calendar_id="primary", max_results=max_results_per_account,
+            time_min=time_min, time_max=time_max, single_events=True,
+            order_by="startTime", page_token=None,
+        ),
+    )
+    items = [e for acct, page in results.items() for e in tag(acct, page["items"])]
+    items.sort(key=_start_key)
+    return merged(items, results, errors)
 
 @register(mcp, core=True)
 def search_events(
