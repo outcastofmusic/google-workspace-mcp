@@ -24,5 +24,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - run: pip install -e .[dev]
-      - run: ruff check .
-      - run: pytest
+      - name: ruff
+        run: |
+          ruff check . > ruff.txt 2>&1 || { echo "::error title=ruff::$(tail -40 ruff.txt | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"; exit 1; }
+      - name: pytest
+        if: always()
+        run: |
+          pytest -q -rfE --tb=short > pytest.txt 2>&1 || { echo "::error title=pytest::$(tail -80 pytest.txt | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"; exit 1; }
