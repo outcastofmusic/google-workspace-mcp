@@ -112,6 +112,6 @@ async def test_fanout_tools_are_read_only_and_take_accounts_list():
         (drive, "search_files_all_accounts"),
     ):
         tool = next(t for t in await mod.mcp.list_tools() if t.name == name)
-        assert tool.annotations.readOnlyHint is True, name
+        assert tool.annotations.read_only_hint is True, name
         assert "accounts" in tool.input_schema["properties"], name
         assert "accounts" not in tool.input_schema.get("required", []), name
