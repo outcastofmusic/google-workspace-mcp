@@ -3,7 +3,11 @@
 Agents feed these tools paths that may come from untrusted content (an email,
 a shared doc), so a path is resolved (``~`` and symlinks) and refused when it
 points into the Google token store, or outside ``GOOGLE_MCP_FILE_ROOT`` when
-that env var is set. Writes refuse to replace an existing file unless asked.
+that env var is set. Without that env var, hidden paths (any ``.``-prefixed
+component, e.g. ``~/.ssh``, ``~/.aws``, ``.env``) and system directories are
+refused too, so an injected instruction cannot attach a key file to an email or
+write into a dotfile; ``GOOGLE_MCP_ALLOW_HIDDEN_PATHS=1`` lifts that.
+Writes refuse to replace an existing file unless asked.
 """
 
 from __future__ import annotations
@@ -28,6 +32,20 @@ def _forbidden_roots() -> list[str]:
     return [os.path.realpath(store.GOOGLE_CONFIG_DIR), os.path.realpath(Path.home() / ".google")]
 
 
+_SYSTEM_ROOTS = ("/etc", "/private/etc", "/proc", "/sys", "/dev", "/boot")
+
+
+def _hidden_allowed() -> bool:
+    flag = os.getenv("GOOGLE_MCP_ALLOW_HIDDEN_PATHS", "")
+    return flag.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _sensitive(real: str) -> bool:
+    if any(_within(real, root) for root in _SYSTEM_ROOTS):
+        return True
+    return any(part.startswith(".") and part not in (".", "..") for part in Path(real).parts)
+
+
 def _resolve(path: str) -> str:
     if not path:
         raise core.InvalidArgumentError("a local path is required")
@@ -41,6 +59,11 @@ def _resolve(path: str) -> str:
             raise core.InvalidArgumentError(
                 f"{path} is outside GOOGLE_MCP_FILE_ROOT ({real_root})"
             )
+    elif _sensitive(real) and not _hidden_allowed():
+        raise core.InvalidArgumentError(
+            f"refusing hidden or system path {path}; set GOOGLE_MCP_FILE_ROOT to a folder "
+            "you choose, or GOOGLE_MCP_ALLOW_HIDDEN_PATHS=1"
+        )
     return real
 
 

@@ -21,6 +21,8 @@ import anyio.to_thread
 import google_auth_core as core
 from mcp.types import ToolAnnotations
 
+from . import policy
+
 
 def _readonly() -> bool:
     return os.getenv("GOOGLE_MCP_READONLY", "").strip().lower() in ("1", "true", "yes", "on")
@@ -65,6 +67,9 @@ _TRANSIENT_MAX_TOTAL_WAIT = 20.0
 # read tools and writes marked idempotent. Calls outside a registered tool
 # default to False and are never retried on 429/5xx.
 _retry_safe: ContextVar[bool] = ContextVar("retry_safe", default=False)
+# Set by the ``register`` wrapper: True while a mutating tool runs, so
+# ``get_api`` applies the account policy (see ``policy.check_account``).
+_mutating: ContextVar[bool] = ContextVar("mutating", default=False)
 # Default cap on what a read tool returns inline, roughly 25k tokens. Bigger
 # results waste the agent's context or get cut off by the client with no hint
 # on how to fetch the rest.
@@ -171,6 +176,8 @@ def get_api(
             inst = factory(resolved)
             _api_cache[key] = inst
         client_lock = _client_locks.setdefault(key, threading.Lock())
+    if _mutating.get():
+        policy.check_account(account, resolved)
     held = getattr(_held, "locks", None)
     if held is not None and client_lock not in held:
         client_lock.acquire()
@@ -276,6 +283,37 @@ def _retry_scope(fn: Callable, safe: bool) -> Callable:
     return wrapper
 
 
+def _policy_scope(fn: Callable, mutating: bool) -> Callable:
+    """Wrap a tool so mutating calls pass the safety policy and get audited.
+
+    Recipient checks run before the tool; account checks run in ``get_api``
+    once the account is resolved (``_mutating`` tells it to).
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        token = _mutating.set(mutating)
+        result: Any = None
+        error: Optional[BaseException] = None
+        try:
+            if mutating:
+                policy.check_recipients(fn.__name__, kwargs)
+            result = fn(*args, **kwargs)
+            return result
+        except BaseException as e:
+            error = e
+            raise
+        finally:
+            _mutating.reset(token)
+            if mutating:
+                account = result.get("account") if isinstance(result, dict) else None
+                policy.audit(
+                    fn.__name__, kwargs, account=account or kwargs.get("account"), error=error
+                )
+
+    return wrapper
+
+
 def _run_scoped(fn: Callable, args: tuple, kwargs: dict) -> Any:
     """Run a tool in the current (worker) thread, releasing any client locks
     that ``get_api`` took on its behalf once it finishes."""
@@ -342,7 +380,9 @@ def register(
             openWorldHint=open_world,
         )
         retry_safe = not mutating or idempotent is True
-        mcp.tool(annotations=annotations)(_off_loop(_retry_scope(fn, retry_safe)))
+        mcp.tool(annotations=annotations)(
+            _off_loop(_policy_scope(_retry_scope(fn, retry_safe), mutating))
+        )
         return fn  # direct callers keep the plain sync function
 
     return deco
