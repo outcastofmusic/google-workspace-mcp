@@ -133,12 +133,18 @@ def list_events_all_accounts(
 def sync_busy_blocks(
     accounts: list[str] | None = None,
     *,
+    calendars: dict[str, str] | None = None,
     days_ahead: int = 14,
     include_all_day: bool = False,
     summary: str = "Busy",
     dry_run: bool = False,
 ) -> dict:
-    """Mirror busy time across accounts: each busy event becomes a private "Busy" block on the other accounts' primary calendars.
+    """Mirror busy time across accounts: each busy event becomes a private "Busy" block on the other accounts' calendars.
+
+    Each account syncs one calendar: its primary, or the calendar ID that
+    `calendars` maps it to (e.g. {"work": "team@group.calendar.google.com"});
+    that calendar is both read for busy time and written with blocks. Use
+    list_calendars to find IDs.
 
     Blocks copy only the time slot. The sync creates, moves and deletes only
     its own blocks, never real events. Run with dry_run=True to see the plan.
@@ -147,6 +153,7 @@ def sync_busy_blocks(
     """
     return busy_sync.sync(
         accounts,
+        calendars=calendars,
         days_ahead=days_ahead,
         include_all_day=include_all_day,
         summary=summary,

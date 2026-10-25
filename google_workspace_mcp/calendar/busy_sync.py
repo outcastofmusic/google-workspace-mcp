@@ -3,7 +3,9 @@
 With several accounts, each calendar only knows its own meetings, so a
 colleague booking your work calendar cannot see your personal appointments.
 The sync copies each busy event's time slot, and nothing else, into every
-other account's primary calendar as a private "Busy" block.
+other account's calendar as a private "Busy" block. Each account takes part
+with one calendar, its primary unless ``calendars`` names another; that
+calendar is both the source of its busy time and the target of the blocks.
 
 How it stays safe:
 
@@ -165,9 +167,12 @@ def apply(
     changes: dict[str, dict],
     api_for: Callable[[str], Any],
     run: Callable[[Callable[[], Any]], Any],
-    calendar_id: str = "primary",
+    calendar_for: Callable[[str], str] = lambda account: "primary",
 ) -> tuple[dict, dict]:
-    """Perform ``changes``. Returns (counts per account, errors per account)."""
+    """Perform ``changes`` on each account's calendar (``calendar_for(account)``).
+
+    Returns (counts per account, errors per account).
+    """
     counts: dict[str, dict] = {}
     errors: dict[str, list] = {}
     for account, todo in changes.items():
@@ -175,6 +180,7 @@ def apply(
         counts[account] = done
         if not any(todo.values()):
             continue
+        calendar_id = calendar_for(account)
         try:
             api = api_for(account)
         except Exception as e:  # noqa: BLE001 - report per account
@@ -199,16 +205,44 @@ def apply(
     return counts, errors
 
 
+def _calendar_map(calendars: Optional[dict[str, str]], names: list[str]) -> dict[str, str]:
+    """Resolve ``calendars`` keys to accounts and check each is in the sync."""
+    import google_auth_core as core
+
+    out: dict[str, str] = {}
+    for key, calendar_id in (calendars or {}).items():
+        if not isinstance(calendar_id, str) or not calendar_id.strip():
+            raise core.InvalidArgumentError(f"calendar ID for {key} is empty")
+        try:
+            account = core.resolve_account(key)
+        except Exception:  # noqa: BLE001 - reported below as not in the sync
+            account = key
+        if account not in names:
+            raise core.InvalidArgumentError(
+                f"calendars names {key}, which is not one of the synced accounts: "
+                + ", ".join(names)
+            )
+        if account in out and out[account] != calendar_id.strip():
+            raise core.InvalidArgumentError(f"two calendars given for {account}; use one")
+        out[account] = calendar_id.strip()
+    return out
+
+
 def sync(
     accounts: Optional[list[str]] = None,
     *,
+    calendars: Optional[dict[str, str]] = None,
     days_ahead: int = 14,
     include_all_day: bool = False,
     summary: str = "Busy",
     dry_run: bool = False,
     now: Optional[datetime.datetime] = None,
 ) -> dict:
-    """List every account's primary calendar, then create, update and delete blocks."""
+    """List each account's calendar, then create, update and delete blocks.
+
+    ``calendars`` maps an account (email or alias) to the one calendar ID it
+    syncs; accounts it leaves out use their primary calendar.
+    """
     import google_auth_core as core
 
     from ..core.fanout import target_accounts
@@ -220,6 +254,7 @@ def sync(
     names = target_accounts(accounts)
     if len(names) < 2:
         raise core.InvalidArgumentError("busy-block sync needs at least two accounts")
+    chosen = _calendar_map(calendars, names)
     start = (now or datetime.datetime.now(datetime.timezone.utc)).astimezone(
         datetime.timezone.utc
     )
@@ -233,7 +268,9 @@ def sync(
         try:
             api, resolved = get_api("calendar", CalendarChangesAPI, name)
             events[resolved] = run_tool(
-                lambda: api.list_window_events("primary", time_min, time_max)
+                lambda: api.list_window_events(
+                    chosen.get(resolved, "primary"), time_min, time_max
+                )
             )
             apis[resolved] = api
         except core.GoogleCoreError as e:
@@ -251,6 +288,7 @@ def sync(
     out: dict[str, Any] = {
         "ok": bool(events),
         "accounts": sorted([*events, *list_errors]),
+        "calendars": {acct: chosen.get(acct, "primary") for acct in sorted(events)},
         "window": {"time_min": time_min, "time_max": time_max},
         "dry_run": dry_run,
         "planned": planned,
@@ -260,7 +298,9 @@ def sync(
         out["note"] = "Some accounts could not be listed, so no blocks were deleted this run."
     if dry_run or not events:
         return out
-    counts, apply_errors = apply(changes, apis.__getitem__, run_tool)
+    counts, apply_errors = apply(
+        changes, apis.__getitem__, run_tool, lambda acct: chosen.get(acct, "primary")
+    )
     out["applied"] = counts
     for acct, errs in apply_errors.items():
         out.setdefault("errors", {}).setdefault(acct, []).extend(errs)
@@ -275,20 +315,34 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     parser = argparse.ArgumentParser(
         prog="gcal-busy-sync",
-        description="Mirror busy time across your Google accounts' primary calendars.",
+        description="Mirror busy time across your Google accounts' calendars.",
     )
     parser.add_argument("--accounts", nargs="+", help="emails or aliases (default: all)")
+    parser.add_argument(
+        "--calendar",
+        action="append",
+        default=[],
+        metavar="ACCOUNT=CALENDAR_ID",
+        help="sync this calendar instead of ACCOUNT's primary (repeat per account)",
+    )
     parser.add_argument("--days", type=int, default=14, help="days ahead to sync (1-90)")
     parser.add_argument("--include-all-day", action="store_true", help="also block all-day events")
     parser.add_argument("--summary", default="Busy", help="title of the blocks")
     parser.add_argument("--dry-run", action="store_true", help="show the plan, change nothing")
     parser.add_argument("--interval", type=int, default=0, help="repeat every N minutes")
     args = parser.parse_args(argv)
+    calendars = {}
+    for item in args.calendar:
+        account, sep, calendar_id = item.partition("=")
+        if not sep or not account or not calendar_id:
+            parser.error(f"--calendar expects ACCOUNT=CALENDAR_ID, got {item!r}")
+        calendars[account] = calendar_id
 
     while True:
         try:
             result = sync(
                 args.accounts,
+                calendars=calendars or None,
                 days_ahead=args.days,
                 include_all_day=args.include_all_day,
                 summary=args.summary,

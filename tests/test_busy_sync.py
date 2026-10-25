@@ -138,12 +138,13 @@ class FakeCalendar:
         self.account = account
 
     def list_window_events(self, calendar_id, time_min, time_max):
+        self.calls.append(("list", self.account, calendar_id))
         if self.account == "me@broken.com":
             raise core.InvalidArgumentError("boom")
         return list(self.calendars.get(self.account, []))
 
     def insert_busy_block(self, calendar_id, body):
-        self.calls.append(("insert", self.account, body["start"]))
+        self.calls.append(("insert", self.account, calendar_id))
         return {"id": "new"}
 
     def patch_busy_block(self, calendar_id, event_id, body):
@@ -183,7 +184,8 @@ def test_sync_applies_the_plan(fake_calendars):
 def test_dry_run_changes_nothing(fake_calendars):
     out = busy_sync.sync(dry_run=True, now=NOW)
     assert out["planned"]["me@home.com"]["create"] == 1
-    assert fake_calendars.calls == [] and "applied" not in out
+    assert [c[0] for c in fake_calendars.calls] == ["list", "list"]
+    assert "applied" not in out
 
 
 def test_failed_account_suspends_deletes(fake_calendars, store_env, write_token):
@@ -205,7 +207,55 @@ def test_sync_needs_two_accounts_and_a_sane_window(store_env, write_token):
 def test_cli_dry_run_prints_json(fake_calendars, capsys):
     assert busy_sync.main(["--dry-run", "--days", "7"]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["dry_run"] is True and fake_calendars.calls == []
+    assert out["dry_run"] is True
+    assert {c[0] for c in fake_calendars.calls} == {"list"}
+
+
+def test_primary_calendars_by_default(fake_calendars):
+    out = busy_sync.sync(now=NOW)
+    assert out["calendars"] == {"me@home.com": "primary", "me@work.com": "primary"}
+    assert {c[2] for c in fake_calendars.calls} == {"primary"}
+
+
+def test_one_chosen_calendar_per_account(fake_calendars):
+    core.set_account_alias("work", "me@work.com")
+    out = busy_sync.sync(calendars={"work": "team@group.calendar.google.com"}, now=NOW)
+    assert out["calendars"] == {
+        "me@home.com": "primary",
+        "me@work.com": "team@group.calendar.google.com",
+    }
+    work_calls = {(c[0], c[2]) for c in fake_calendars.calls if c[1] == "me@work.com"}
+    assert work_calls == {
+        ("list", "team@group.calendar.google.com"),
+        ("insert", "team@group.calendar.google.com"),
+        ("delete", "team@group.calendar.google.com"),
+    }
+    assert {c[2] for c in fake_calendars.calls if c[1] == "me@home.com"} == {"primary"}
+
+
+@pytest.mark.parametrize("calendars, match", [
+    ({"ghost@x.com": "c1"}, "not one of the synced accounts"),
+    ({"me@work.com": "  "}, "is empty"),
+])
+def test_bad_calendar_choice_is_refused(fake_calendars, calendars, match):
+    with pytest.raises(core.InvalidArgumentError, match=match):
+        busy_sync.sync(calendars=calendars, now=NOW)
+    assert fake_calendars.calls == []
+
+
+def test_calendar_for_account_outside_accounts_list_is_refused(fake_calendars):
+    with pytest.raises(core.InvalidArgumentError, match="not one of the synced accounts"):
+        busy_sync.sync(
+            ["me@work.com", "me@home.com"], calendars={"me@other.com": "c1"}, now=NOW
+        )
+
+
+def test_cli_calendar_flag(fake_calendars, capsys):
+    assert busy_sync.main(["--dry-run", "--calendar", "me@work.com=team@group"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["calendars"]["me@work.com"] == "team@group"
+    with pytest.raises(SystemExit):
+        busy_sync.main(["--calendar", "no-equals-sign"])
 
 
 @pytest.mark.anyio
@@ -215,3 +265,4 @@ async def test_tool_is_registered_as_mutating():
     tool = next(t for t in await server.mcp.list_tools() if t.name == "sync_busy_blocks")
     assert tool.annotations.read_only_hint is False
     assert tool.annotations.destructive_hint is False
+    assert "calendars" in tool.input_schema["properties"]
