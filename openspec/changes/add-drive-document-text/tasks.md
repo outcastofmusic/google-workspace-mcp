@@ -23,4 +23,4 @@
 ## 5. Docs and checks
 
 - [x] 5.1 Document the supported formats, `pages`, `read_files` and `list_folder_tree` in the README, and note the extractors in CLAUDE.md's architecture block; verify the README examples match the tool signatures
-- [ ] 5.2 Run `ruff check .` and `pytest` locally and verify both pass, then open the PR and verify CI passes on Python 3.10-3.13
+- [x] 5.2 Run `ruff check .` and `pytest` locally and verify both pass, then open the PR and verify CI passes on Python 3.10-3.13
