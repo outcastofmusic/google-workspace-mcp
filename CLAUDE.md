@@ -68,6 +68,8 @@ Key invariants, all enforced by `core/runtime.py` — do not bypass them:
 - `mutating=True` — the tool is **not registered at all** when `GOOGLE_MCP_READONLY` env is set (`1/true/yes/on`). It never appears in `list_tools`. Read tools use bare `@register(mcp)`.
 - `destructive=True` — appends a `[DESTRUCTIVE]` warning to the tool's docstring/description. Deletes, clears, and permanent changes use `mutating=True, destructive=True`.
 
+Mutating calls also pass `core/policy.py` (recipient allowlist, required/read-only accounts, audit log): recipient checks run in `register`'s wrapper, account checks in `get_api`. Policy env vars are read at call time; see the README's "Safety policy" section.
+
 `READONLY` is read once at import, so servers must be launched with the env already set. When adding a write/delete tool, set these flags or it will leak into read-only mode.
 
 ## Tests

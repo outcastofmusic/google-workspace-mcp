@@ -236,13 +236,21 @@ and those that reach people outside the account also set `openWorldHint`.
 
 ## Local file access
 
-Tools that read or write local files (mail attachments, Drive upload/download/
-export, Gmail attachment download) go through one shared path guard: paths are
-resolved (including symlinks) and anything inside the `~/.google` token store
-is refused. Set `GOOGLE_MCP_FILE_ROOT=/some/dir` to confine all local reads and
-writes to that directory (downloads then need an explicit path inside it).
-Downloads never replace an existing file unless the call passes
-`overwrite=true`; a clash in the default temp dir gets a new name instead.
+Tools that read or write local files (mail attachments, Drive upload/download/export, Gmail attachment download) go through one shared path guard: paths are resolved (including symlinks) and anything inside the `~/.google` token store is refused. Hidden paths (any `.`-prefixed component, such as `~/.ssh`, `~/.aws` or `.env`) and system directories (`/etc`, `/proc`, `/sys`, `/dev`, `/boot`) are refused too, so an instruction hidden in an email cannot attach a key file or write into a dotfile. Set `GOOGLE_MCP_FILE_ROOT=/some/dir` to confine all local reads and writes to that directory instead (downloads then need an explicit path inside it), or `GOOGLE_MCP_ALLOW_HIDDEN_PATHS=1` to lift the hidden-path rule. Downloads never replace an existing file unless the call passes `overwrite=true`; a clash in the default temp dir gets a new name instead.
+
+## Safety policy
+
+An agent reads untrusted content and may follow instructions hidden in it. These env vars limit what a mutating tool can do; set them in each server's `env` block.
+
+| Variable | Effect |
+|---|---|
+| `GOOGLE_MCP_REQUIRE_ACCOUNT` | `auto` (default): when more than one account is configured, mutating tools refuse a call that omits `account`, so nothing is sent from the default account by accident. `1` always requires it; `0` never does. |
+| `GOOGLE_MCP_READONLY_ACCOUNTS` | Comma-separated emails or aliases. Mutating tools refuse these accounts; other accounts stay writable. |
+| `GOOGLE_MCP_ALLOWED_RECIPIENTS` | Comma-separated addresses or domains (`bob@x.com`, `x.com`, `@x.com`; a domain also matches its subdomains). Mutating tools refuse any `to`/`cc`/`bcc`, attendee, share target or filter `forward` address outside the list, and refuse "anyone" links. |
+| `GOOGLE_MCP_ALLOW_IMPLICIT_RECIPIENTS` | With an allowlist set, `reply_to_message` and `send_draft` are refused because their recipients are not named in the call. Set `1` to allow them. |
+| `GOOGLE_MCP_AUDIT_LOG` | Path of a JSON-lines file (created with mode `0600`). Every mutating call is appended with time, tool, account, arguments (strings cut at 200 characters) and outcome, including calls the policy refused. |
+
+A refused call returns an error starting `Blocked by policy:` that names the setting involved.
 
 ## Smaller tool set
 
