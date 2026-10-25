@@ -40,8 +40,9 @@ them.
 ### Requirement: Drive folders in scope
 With `drive_folders` set, a Drive, Docs or Sheets call SHALL fail with an error starting
 `Outside scope:` that names the file when any file or folder it names (`file_id`, `file_ids`,
-`folder_id`, `parent_id`, `new_parent_id`, `document_id`, `spreadsheet_id`) is neither one of the
-scope's folders for the call's account nor below one of them through its parent folders. A
+`folder_id`, `parent_id`, `new_parent_id`, `document_id`, `spreadsheet_id`, also as keys of the
+`items` of the batch tools) is neither one of the scope's folders for the call's account nor below
+one of them through its parent folders. A
 `drive_id` argument and `list_drives` SHALL be refused. A file that has no parent in the
 account's view, such as one only shared with the user, is outside the scope.
 
@@ -69,7 +70,8 @@ scope, so a page MAY hold fewer than `page_size` files while `next_page_token` s
 
 ### Requirement: Creating inside the scope
 With `drive_folders` set, a call that creates a file SHALL name a parent inside the scope
-(`parent_id` for `upload_file`, `create_folder` and `copy_file`, `folder_id` for
+(`parent_id` for `upload_file`, `create_folder`, `copy_file` and each item of
+`batch_create_folders`, `folder_id` for
 `create_document`, `create_document_from_markdown` and `create_spreadsheet`), and SHALL fail
 with an error naming that parameter when it names none. `create_document` and
 `create_spreadsheet` SHALL accept an optional `folder_id` with or without a scope.

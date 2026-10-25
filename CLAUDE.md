@@ -30,7 +30,8 @@ google-auth-core (external dep)   shared ~/.google token store + authorized-serv
 google_workspace_mcp/
   core/      build_server, get_api (account resolution + warm-client cache),
              run_tool (error mapping), register (read-only gate), ok (envelope),
-             common_tools (list_accounts / whoami / auth_status)
+             common_tools (list_accounts / whoami / auth_status),
+             scope (client scope from _meta: accounts, Drive folders)
   gmail/     server.py + changes_api.GmailChangesAPI (subclass)  -> gmail-mcp
   calendar/  server.py + changes_api.CalendarChangesAPI        -> gcal-mcp
   sheets/    server.py + sheets_api.SheetsAPI (Sheets v4)      -> gsheets-mcp
@@ -73,6 +74,15 @@ Key invariants, all enforced by `core/runtime.py` — do not bypass them:
 Mutating calls also pass `core/policy.py` (recipient allowlist, required/read-only accounts, audit log): recipient checks run in `register`'s wrapper, account checks in `get_api`. Policy env vars are read at call time; see the README's "Safety policy" section.
 
 `READONLY` is read once at import, so servers must be launched with the env already set. When adding a write/delete tool, set these flags or it will leak into read-only mode.
+
+## Client scope
+
+A client may limit one call to some accounts and Drive folders through `_meta["io.github.outcastofmusic.workspace/scope"]` (`core/scope.py`; README "Client scope"). `WorkspaceServer.call_tool` parses it from `context.request_context.meta` and sets the `scope.current` ContextVar, which the tool's worker thread inherits. `GOOGLE_MCP_REQUIRE_SCOPE=1` refuses calls without one.
+
+- **Accounts:** `get_api` (through `_client`) refuses a resolved account outside `accounts` for every call. `fanout.target_accounts`, `list_accounts`, `auth_status` and `whoami` also honor it. Never resolve an account and call Google without `get_api`.
+- **Drive folders:** the Drive, Docs and Sheets servers rebind `register = functools.partial(_register, drive_scoped=True)`. The `drive_scoped` wrapper checks the seven parameters in `runtime.SCOPED_FILE_PARAMS` (and the same keys inside `items`) through the parent chain before the tool runs, refuses `drive_id` and `list_drives`, requires the parent parameter of create tools (`_CREATE_PARENT`), and filters the file lists of `_FILTERED_TOOLS`. A new Drive-family tool must name files only through those seven parameters; a new create tool must be added to `_CREATE_PARENT`, and a new listing tool to `_FILTERED_TOOLS`. Gmail and Calendar tools are never drive-scoped, so their `message_id`/`event_id` are not read as files.
+- The folder check uses `runtime.borrow_api`, which holds the Drive client lock only for the check (or reuses it when the tool already holds it), so it cannot deadlock with the tool's own clients.
+- Refusals raise `core.InvalidArgumentError("Outside scope: ...")`. Audit entries carry `scope`.
 
 ## Tests
 
