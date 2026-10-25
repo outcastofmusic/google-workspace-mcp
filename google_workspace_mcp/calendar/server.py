@@ -6,6 +6,7 @@ import datetime
 from ..contacts.tools import register_contacts_tools
 from ..core import build_server, get_api, ok, register, run_tool
 from ..core.fanout import fan_out, merged, tag
+from . import busy_sync
 from .changes_api import CalendarChangesAPI
 
 mcp = build_server(
@@ -126,6 +127,38 @@ def list_events_all_accounts(
     items = [e for acct, page in results.items() for e in tag(acct, page["items"])]
     items.sort(key=_start_key)
     return merged(items, results, errors)
+
+
+@register(mcp, mutating=True)
+def sync_busy_blocks(
+    accounts: list[str] | None = None,
+    *,
+    calendars: dict[str, str] | None = None,
+    days_ahead: int = 14,
+    include_all_day: bool = False,
+    summary: str = "Busy",
+    dry_run: bool = False,
+) -> dict:
+    """Mirror busy time across accounts: each busy event becomes a private "Busy" block on the other accounts' calendars.
+
+    Each account syncs one calendar: its primary, or the calendar ID that
+    `calendars` maps it to (e.g. {"work": "team@group.calendar.google.com"});
+    that calendar is both read for busy time and written with blocks. Use
+    list_calendars to find IDs.
+
+    Blocks copy only the time slot. The sync creates, moves and deletes only
+    its own blocks, never real events. Run with dry_run=True to see the plan.
+    Covers now to `days_ahead` days ahead; all-day events are skipped unless
+    include_all_day is set.
+    """
+    return busy_sync.sync(
+        accounts,
+        calendars=calendars,
+        days_ahead=days_ahead,
+        include_all_day=include_all_day,
+        summary=summary,
+        dry_run=dry_run,
+    )
 
 @register(mcp, core=True)
 def search_events(

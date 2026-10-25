@@ -44,6 +44,7 @@ dev = ["pytest>=7", "pytest-anyio>=0.0.0", "anyio>=4", "ruff>=0.4"]
 [project.scripts]
 gmail-mcp = "google_workspace_mcp.gmail.server:main"
 gcal-mcp = "google_workspace_mcp.calendar.server:main"
+gcal-busy-sync = "google_workspace_mcp.calendar.busy_sync:main"
 gsheets-mcp = "google_workspace_mcp.sheets.server:main"
 gdocs-mcp = "google_workspace_mcp.docs.server:main"
 gdrive-mcp = "google_workspace_mcp.drive.server:main"
