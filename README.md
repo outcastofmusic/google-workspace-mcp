@@ -27,6 +27,7 @@ google_workspace_mcp/
   sheets/    SheetsAPI (Sheets API v4)               -> gsheets-mcp
   docs/      DocsAPI (Docs API v1)                   -> gdocs-mcp
   drive/     DriveAPI (Drive API v3)                 -> gdrive-mcp
+             + extract.py: PDF (pypdf), docx, pptx, xlsx text
   contacts/  PeopleAPI (People API v1)               -> search_contacts on gmail-mcp + gcal-mcp
 ```
 
@@ -63,6 +64,13 @@ runs the Google call through shared error mapping, and returns
   `delete_conditional_format`; `protect_range` (a range or a whole sheet, editors or
   warning-only), `list_protected_ranges`, `unprotect_range`; and `add_named_range`,
   `list_named_ranges`, `update_named_range`, `delete_named_range`.
+
+### Drive (`gdrive-mcp`)
+
+- **Document text inline**: `read_file_text` returns the text of plain-text files, PDF, Word (docx), PowerPoint (pptx) and Excel (xlsx) files, and native Docs, Sheets and Slides, without saving anything to disk. Pages, slides and sheets are marked `[page 3]`, `[slide 3]` and `[sheet Budget]`; speaker notes follow their slide; spreadsheet rows are tab-separated and every sheet is included. `pages="3-7"` (or `"1,4,9-10"`) reads part of a PDF or presentation, and the result reports `total` and `selected`. Long text pages with `max_chars`/`offset`. Documents are read up to 25 MiB and plain-text files up to 1 MiB; anything larger, and images, need `download_file`. Scanned PDFs have no text layer: their pages come back marked, with a note.
+- **Several files at once**: `read_files(file_ids=[...])` reads each file as above, cuts each at `max_chars_per_file` (default 100,000) and stops at `max_chars_total` (default 400,000), listing the rest under `skipped` and failures under `errors`.
+- **Folder trees**: `list_folder_tree(folder_id=...)` lists every file under a folder and its subfolders, with `path`, `modifiedTime`, `md5Checksum` and `webViewLink`, up to `max_files` (default 500) and `max_depth` (default 10).
+- **Untrusted files**: Office XML that declares a DOCTYPE is refused, an Office file may expand to at most 200 MiB, and password-protected PDFs fail with an error that says so.
 
 ### Contact lookup (`gmail-mcp`, `gcal-mcp`)
 

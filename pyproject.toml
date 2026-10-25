@@ -32,6 +32,8 @@ dependencies = [
     "gmail-cli-oauth>=1.6.0",
     "google-calendar-cli>=1.7.0",
     "google-api-python-client>=2.0.0",
+    # PDF text for read_file_text (BSD-3-Clause, pure Python).
+    "pypdf>=5",
 ]
 
 [project.urls]

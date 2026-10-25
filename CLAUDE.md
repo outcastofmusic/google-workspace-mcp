@@ -36,6 +36,8 @@ google_workspace_mcp/
   sheets/    server.py + sheets_api.SheetsAPI (Sheets v4)      -> gsheets-mcp
   docs/      server.py + docs_api.DocsAPI (Docs v1)            -> gdocs-mcp
   drive/     server.py + drive_api.DriveAPI (Drive v3)         -> gdrive-mcp
+             + extract.py (PDF via pypdf; docx/pptx/xlsx via stdlib zip+XML,
+               DOCTYPE refused, 200 MiB expansion cap) used by read_file_text
 ```
 
 Gmail and Calendar reuse the API wrappers from their sibling CLI packages (`gmail_cli`, `google_calendar_cli`); Sheets/Docs/Drive have their own thin wrappers in this repo built on `core.get_service(name, version, account=...)`.

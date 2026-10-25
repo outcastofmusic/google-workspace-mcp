@@ -12,6 +12,7 @@ import google_auth_core as core
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from ..core.paths import free_path, safe_path
+from . import extract
 
 GOOGLE_APPS_PREFIX = "application/vnd.google-apps."
 FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -41,6 +42,7 @@ CONVERSION_DEFAULT_SOURCE: dict[str, str] = {
 }
 
 FILE_LIST_FIELDS = "nextPageToken, files(id, name, mimeType, size, modifiedTime, parents)"
+FOLDER_TREE_FIELDS = "nextPageToken, files(id, name, mimeType, size, modifiedTime, md5Checksum, webViewLink)"
 FILE_METADATA_FIELDS = "id, name, mimeType, size, modifiedTime, parents, webViewLink, trashed, owners, shared"
 CHANGE_LIST_FIELDS = (
     "nextPageToken,newStartPageToken,"
@@ -56,6 +58,8 @@ REPLY_FIELDS = "id,content,author(displayName),createdTime,modifiedTime,action,d
 
 # Max bytes read_file_text will download (1 MiB); max_chars/offset page through it.
 TEXT_READ_MAX_BYTES = 1_048_576
+# Max bytes read_file_text downloads for PDF/Office files and native exports.
+DOCUMENT_READ_MAX_BYTES = 25 * 1024 * 1024
 DOWNLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
 # format alias -> export mimeType, keyed by source Google Apps mimeType.
@@ -323,42 +327,101 @@ class DriveAPI:
             "exportMimeType": export_mime,
         }
 
-    def read_file_text(self, file_id: str, max_bytes: int = TEXT_READ_MAX_BYTES):
+    def read_file_text(
+        self,
+        file_id: str,
+        max_bytes: int = TEXT_READ_MAX_BYTES,
+        pages: str | None = None,
+    ):
+        """Text of one file: plain text as is; PDF, Word, PowerPoint, Excel and
+        native Docs, Sheets and Slides extracted with page/slide/sheet markers."""
         meta = self.get_file(file_id)
         mime = meta.get("mimeType", "")
-        if _is_google_native(mime):
-            if mime == FOLDER_MIME:
-                raise ValueError("read_file_text cannot read a folder")
-            if mime == "application/vnd.google-apps.document":
-                export_mime = "text/plain"
-            elif mime == "application/vnd.google-apps.spreadsheet":
-                export_mime = "text/csv"
+        base = {"fileId": file_id, "name": meta.get("name"), "mimeType": mime}
+        if mime == FOLDER_MIME:
+            raise ValueError("read_file_text cannot read a folder; use list_folder_tree")
+        if mime == "application/vnd.google-apps.document":
+            if pages:
+                raise ValueError("pages applies only to PDF files and presentations")
+            request = self._files().export_media(fileId=file_id, mimeType="text/plain")
+            data = _download_to_bytes(request, max_bytes=DOCUMENT_READ_MAX_BYTES)
+            return {**base, "bytes": len(data), "text": data.decode("utf-8", errors="replace")}
+        native_as = {
+            "application/vnd.google-apps.spreadsheet": extract.XLSX_MIME,
+            PRESENTATION_MIME: extract.PPTX_MIME,
+        }
+        if mime in native_as or mime in extract.EXTRACTABLE:
+            if mime in native_as:
+                request = self._files().export_media(fileId=file_id, mimeType=native_as[mime])
+                kind = native_as[mime]
             else:
-                raise ValueError(
-                    f"read_file_text cannot extract text from {mime!r}; use export_file"
-                )
-            request = self._files().export_media(fileId=file_id, mimeType=export_mime)
-        else:
-            if int(meta.get("size") or 0) > max_bytes:
-                raise ValueError(
-                    f"file is {meta['size']} bytes, exceeding read_file_text cap of {max_bytes}; "
-                    "use download_file or export_file instead"
-                )
-            request = self._files().get_media(**self._all_drives(fileId=file_id))
+                if int(meta.get("size") or 0) > DOCUMENT_READ_MAX_BYTES:
+                    raise ValueError(
+                        f"file is {meta['size']} bytes, exceeding the read_file_text cap of "
+                        f"{DOCUMENT_READ_MAX_BYTES} for documents; use download_file instead"
+                    )
+                request = self._files().get_media(**self._all_drives(fileId=file_id))
+                kind = mime
+            data = _download_to_bytes(request, DOCUMENT_READ_MAX_BYTES)
+            out = extract.extract(data, kind, pages)
+            return {**base, "bytes": len(data), **out}
+        if _is_google_native(mime):
+            raise ValueError(f"read_file_text cannot extract text from {mime!r}; use export_file")
+        if pages:
+            raise ValueError("pages applies only to PDF files and presentations")
+        if int(meta.get("size") or 0) > max_bytes:
+            raise ValueError(
+                f"file is {meta['size']} bytes, exceeding read_file_text cap of {max_bytes}; "
+                "use download_file or export_file instead"
+            )
+        request = self._files().get_media(**self._all_drives(fileId=file_id))
         data = _download_to_bytes(request, max_bytes)
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise ValueError(
-                "file is not UTF-8 text; use download_file for binary content"
+                "file is not UTF-8 text or a supported document; use download_file"
             ) from exc
-        return {
-            "fileId": file_id,
-            "name": meta.get("name"),
-            "mimeType": mime,
-            "bytes": len(data),
-            "text": text,
-        }
+        return {**base, "bytes": len(data), "text": text}
+
+    def list_folder_tree(self, folder_id: str, max_files: int = 500, max_depth: int = 10):
+        """Every non-folder file under ``folder_id``, breadth first, with its folder path."""
+        root = self.get_file(folder_id)
+        if root.get("mimeType") != FOLDER_MIME:
+            raise ValueError(f"{folder_id} is not a folder")
+        files: list[dict] = []
+        seen = {folder_id}
+        queue = [(folder_id, root.get("name") or "", 0)]
+        truncated = False
+        while queue and not truncated:
+            current, path, depth = queue.pop(0)
+            token = None
+            while True:
+                params = self._all_drives(
+                    q=f"trashed = false and '{current}' in parents",
+                    pageSize=1000,
+                    orderBy="folder,name",
+                    fields=FOLDER_TREE_FIELDS,
+                    includeItemsFromAllDrives=True,
+                )
+                if token:
+                    params["pageToken"] = token
+                page = self._files().list(**params).execute()
+                for f in page.get("files", []):
+                    if f.get("mimeType") == FOLDER_MIME:
+                        if depth + 1 <= max_depth and f["id"] not in seen:
+                            seen.add(f["id"])
+                            queue.append((f["id"], f"{path}/{f.get('name', '')}", depth + 1))
+                        continue
+                    if len(files) >= max_files:
+                        truncated = True
+                        break
+                    files.append({**f, "path": path})
+                token = page.get("nextPageToken")
+                if truncated or not token:
+                    break
+        return {"folder": {"id": folder_id, "name": root.get("name")}, "files": files,
+                "truncated": truncated}
 
     def upload_file(
         self,
