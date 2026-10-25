@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..core import build_server, cap_text, get_api, ok, register, run_tool
+from ..core.fanout import fan_out, merged, tag
 from ..core.paths import safe_path
 from .drive_api import DriveAPI
 
@@ -45,6 +46,35 @@ def search_files(
     next_token = raw.pop("nextPageToken", None)
     return ok(resolved, raw, next_page_token=next_token)
 
+
+
+@register(mcp)
+def search_files_all_accounts(
+    accounts: list[str] | None = None,
+    query: str | None = None,
+    name: str | None = None,
+    mime_type: str | None = None,
+    full_text: str | None = None,
+    page_size_per_account: int = 25,
+) -> dict:
+    """Search Drive in every configured account (or only `accounts`) and merge the files, newest first.
+
+    Takes the same filters as search_files. Each file carries an `account` key;
+    an account that fails is listed under `errors`.
+    """
+    results, errors = fan_out(
+        "drive",
+        DriveAPI,
+        accounts,
+        lambda api: api.search_files(
+            query=query, name=name, mime_type=mime_type, parent_id=None,
+            full_text=full_text, drive_id=None, page_size=page_size_per_account,
+            page_token=None,
+        ),
+    )
+    items = [f for acct, raw in results.items() for f in tag(acct, raw.get("files", []))]
+    items.sort(key=lambda f: f.get("modifiedTime") or "", reverse=True)
+    return merged(items, results, errors)
 
 @register(mcp, core=True)
 def list_files(

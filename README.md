@@ -220,6 +220,16 @@ create_event(account="you@personal.com", summary="Dinner", start_time=..., end_t
 read_range(account="work", spreadsheet_id="...", range="Sheet1!A1:C10")
 ```
 
+## Search across accounts
+
+Three read tools query every configured account in one call and merge the results; pass `accounts=["work", "me@home.com"]` to limit them:
+
+- `search_messages_all_accounts(query=...)` (Gmail): newest first.
+- `list_events_all_accounts(time_min=..., time_max=...)` (Calendar): each account's primary calendar as one agenda, sorted by start time.
+- `search_files_all_accounts(name=..., full_text=..., ...)` (Drive): newest first.
+
+Every item carries an `account` key. An account that fails appears under `errors`; the other accounts still return.
+
 ## Read-only mode
 
 Set `GOOGLE_MCP_READONLY=1` in a server's environment to hide every mutating

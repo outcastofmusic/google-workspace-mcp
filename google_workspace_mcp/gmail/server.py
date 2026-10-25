@@ -17,6 +17,7 @@ from ..core import (
     register,
     run_tool,
 )
+from ..core.fanout import fan_out, merged, tag
 from ..core.paths import free_path, safe_dir, safe_path, safe_paths
 from .changes_api import GmailChangesAPI
 
@@ -90,6 +91,33 @@ def search_messages(
     )
     return ok(resolved, page["items"], next_page_token=page.get("nextPageToken"))
 
+
+
+@register(mcp)
+def search_messages_all_accounts(
+    accounts: list[str] | None = None,
+    *,
+    query: str,
+    max_results_per_account: int = 10,
+    format: str = "metadata",
+) -> dict:
+    """Search messages in every configured account (or only `accounts`) and merge them, newest first.
+
+    Each item carries an `account` key. An account that fails is listed under
+    `errors`; the others still return. Use search_messages to page one account.
+    """
+    results, errors = fan_out(
+        "gmail",
+        GmailChangesAPI,
+        accounts,
+        lambda api: api.search_with_details(
+            max_results=max_results_per_account, label_ids=None, query=query,
+            format=format, page_token=None,
+        ),
+    )
+    items = [m for acct, page in results.items() for m in tag(acct, page["items"])]
+    items.sort(key=lambda m: int(m.get("internalDate") or 0), reverse=True)
+    return merged(items, results, errors)
 
 _ATTACHMENT_HINT = "Inline attachment data was dropped to fit max_chars; fetch files with download_attachment."
 

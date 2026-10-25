@@ -65,8 +65,8 @@ async def test_tool_list_includes_expected_names():
 @pytest.mark.anyio
 async def test_tool_count():
     tools = await server.mcp.list_tools()
-    # 3 common + 12 read + 12 write + 3 destructive = 30
-    assert len(tools) == 30
+    # 3 common + 13 read (incl. list_events_all_accounts) + 12 write + 3 destructive = 31
+    assert len(tools) == 31
 
 
 # ---------------------------------------------------------------------------
