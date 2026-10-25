@@ -375,8 +375,9 @@ _CREATE_PARENT = {
 _ITEM_CREATE_PARENT = {"batch_create_folders": "parent_id"}
 # Tools whose file lists are cut to the scope after the Google call.
 _FILTERED_TOOLS = frozenset({"search_files", "list_files", "search_files_all_accounts"})
-# Tools that reach beyond any folder by design.
-_REFUSED_TOOLS = frozenset({"list_drives"})
+# Tools that reach beyond any folder by design. list_changes lists the
+# changes of the whole Drive, with file names, whatever folder they are in.
+_REFUSED_TOOLS = frozenset({"list_drives", "list_changes"})
 
 
 def _named_files(kwargs: dict) -> list[tuple[str, str]]:

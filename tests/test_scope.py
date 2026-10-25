@@ -396,6 +396,10 @@ async def test_drive_id_and_list_drives_are_refused(drive):
     res = await call(drive_server.mcp, "search_files", {"name": "x", "drive_id": "SD"}, DDB)
     assert res.is_error and "Outside scope: drive_id" in text(res)
     drive.search_files.assert_not_called()
+    # list_changes names changed files anywhere in the Drive.
+    res = await call(drive_server.mcp, "list_changes", {"page_token": "1"}, DDB)
+    assert res.is_error and "Outside scope: list_changes" in text(res)
+    drive.list_changes.assert_not_called()
 
 
 async def test_an_account_without_folders_reaches_nothing(drive, store_env, write_token):

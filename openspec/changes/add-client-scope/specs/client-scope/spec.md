@@ -43,7 +43,8 @@ With `drive_folders` set, a Drive, Docs or Sheets call SHALL fail with an error 
 `folder_id`, `parent_id`, `new_parent_id`, `document_id`, `spreadsheet_id`, also as keys of the
 `items` of the batch tools) is neither one of the scope's folders for the call's account nor below
 one of them through its parent folders. A
-`drive_id` argument and `list_drives` SHALL be refused. A file that has no parent in the
+`drive_id` argument, `list_drives` and `list_changes` SHALL be refused, since they reach the whole
+Drive. A file that has no parent in the
 account's view, such as one only shared with the user, is outside the scope.
 
 #### Scenario: File in a subfolder
