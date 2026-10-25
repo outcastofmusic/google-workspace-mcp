@@ -21,4 +21,4 @@
 
 - [x] 4.1 Add the scope to audit entries. Verify: the audit test shows `scope` on a scoped and `null` on an unscoped mutating call.
 - [x] 4.2 Document the scope (key, shape, what each part limits, `GOOGLE_MCP_REQUIRE_SCOPE`, the cost of ancestry checks) in the README's safety section and in CLAUDE.md. Verify: the README example `_meta` parses with the code's parser in a test.
-- [ ] 4.3 Run `ruff check .` and `pytest`, then open the PR and verify CI passes on Python 3.10-3.13.
+- [x] 4.3 Run `ruff check .` and `pytest`, then open the PR and verify CI passes on Python 3.10-3.13.
