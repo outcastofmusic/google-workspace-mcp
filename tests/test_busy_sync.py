@@ -148,11 +148,11 @@ class FakeCalendar:
         return {"id": "new"}
 
     def patch_busy_block(self, calendar_id, event_id, body):
-        self.calls.append(("patch", self.account, event_id))
+        self.calls.append(("patch", self.account, calendar_id, event_id))
         return {"id": event_id}
 
     def delete_busy_block(self, calendar_id, event_id):
-        self.calls.append(("delete", self.account, event_id))
+        self.calls.append(("delete", self.account, calendar_id, event_id))
         return True
 
 
@@ -176,7 +176,7 @@ def test_sync_applies_the_plan(fake_calendars):
     assert out["ok"] and out["accounts"] == ["me@home.com", "me@work.com"]
     assert out["planned"]["me@work.com"] == {"create": 1, "update": 0, "delete": 1}
     assert out["applied"]["me@home.com"] == {"created": 1, "updated": 0, "deleted": 0}
-    assert ("delete", "me@work.com", "b-old") in fake_calendars.calls
+    assert ("delete", "me@work.com", "primary", "b-old") in fake_calendars.calls
     assert out["window"]["time_min"].startswith("2026-10-26T06:00:00")
     assert out["window"]["time_max"].startswith("2026-11-09T06:00:00")
 
