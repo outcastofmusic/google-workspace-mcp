@@ -15,6 +15,7 @@
 
 ## 3. Docs and gates
 
-- [ ] 3.1 README (the server, its tools, the outline format, the `.mcp.json` example) and CLAUDE.md (architecture block and the scope parameters). Verify: the README's outline example parses into the requests the unit test expects.
+- [x] 3.1 README (the server, its tools, the outline format, the `.mcp.json` example) and CLAUDE.md (architecture block and the scope parameters). Verify: the README's outline example parses into the requests the unit test expects.
 - [ ] 3.2 Run `ruff check .` and `pytest`; push, open the PR, and verify CI passes on Python 3.10-3.13.
 - [ ] 3.3 Run the opt-in live test (`GOOGLE_MCP_LIVE=1`) that builds and deletes a deck, when a token is available; otherwise note that it was not run.
+  Note: `test_slides_roundtrip_live` in `tests/test_live.py` is written but was not run: no real token was available on 2026-10-25. The box stays open until someone runs `GOOGLE_MCP_LIVE=1 pytest tests/test_live.py -k slides` with the Slides API enabled.

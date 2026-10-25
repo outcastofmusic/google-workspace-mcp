@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -581,3 +582,25 @@ def test_read_only_mode_registers_only_read_presentation():
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == ["auth_status", "list_accounts", "read_presentation", "whoami"]
 
+
+# --- the README's outline example -------------------------------------------------
+
+def test_readme_outline_example_builds_the_expected_requests(monkeypatch):
+    readme = (ROOT / "README.md").read_text()
+    blocks = [b for b in re.findall(r"```json\n(.*?)```", readme, re.S)
+              if "create_presentation_from_outline" in b]
+    assert blocks, "README has no create_presentation_from_outline example"
+    example = json.loads(blocks[0])
+    assert example["name"] == "create_presentation_from_outline"
+    args = example["arguments"]
+    _ids(monkeypatch)
+    reqs, made = slides_api.outline_requests(_deck([]), slides_api.check_items(args["slides"]))
+    creates = [r["createSlide"] for r in reqs if "createSlide" in r]
+    assert [c["slideLayoutReference"]["layoutId"] for c in creates] == ["L_TITLE", "L_TB", "L_TB"]
+    bodies = [r["insertText"]["text"] for r in reqs
+              if "insertText" in r and r["insertText"]["objectId"].endswith("_b")]
+    assert bodies[0] == "October 2026"
+    assert bodies[1] == "OCR pipeline\ndone\n\tOCR timeout fixed\n\tretry on 429"
+    bullets = [r["createParagraphBullets"]["textRange"] for r in reqs if "createParagraphBullets" in r]
+    assert bullets[0] == {"type": "FIXED_RANGE", "startIndex": 13, "endIndex": 50}
+    assert [m["notes"] for m in made] == ["", "Mention the OCR fix", ""]

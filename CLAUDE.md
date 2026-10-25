@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-One PyPI distribution (`google-workspace-suite-mcp`) that ships **five aligned MCP servers** for Google Workspace (Gmail, Calendar, Sheets, Docs, Drive) plus the `google-auth` login CLI. The five servers are separate console-script entry points but share one runtime `core/` and one on-disk credential store, which is what keeps them behaving identically.
+One PyPI distribution (`google-workspace-suite-mcp`) that ships **six aligned MCP servers** for Google Workspace (Gmail, Calendar, Sheets, Docs, Drive, Slides), the combined `gworkspace-mcp`, plus the `google-auth` login CLI. The six servers are separate console-script entry points but share one runtime `core/` and one on-disk credential store, which is what keeps them behaving identically.
 
 ## Commands
 
@@ -39,9 +39,14 @@ google_workspace_mcp/
   drive/     server.py + drive_api.DriveAPI (Drive v3)         -> gdrive-mcp
              + extract.py (PDF via pypdf; docx/pptx/xlsx via stdlib zip+XML,
                DOCTYPE refused, 200 MiB expansion cap) used by read_file_text
+  slides/    server.py + slides_api.SlidesAPI (Slides v1)      -> gslides-mcp
+             outline bodies ("- " bullets, 2 spaces per level) -> one batchUpdate,
+             speaker notes in a second one; read_presentation capped by slide
+  workspace/ server.py: every server's tools in one process    -> gworkspace-mcp
+             (names two servers share get the service prefix)
 ```
 
-Gmail and Calendar reuse the API wrappers from their sibling CLI packages (`gmail_cli`, `google_calendar_cli`); Sheets/Docs/Drive have their own thin wrappers in this repo built on `core.get_service(name, version, account=...)`.
+Gmail and Calendar reuse the API wrappers from their sibling CLI packages (`gmail_cli`, `google_calendar_cli`); Sheets/Docs/Drive/Slides have their own thin wrappers in this repo built on `core.get_service(name, version, account=...)`.
 
 ## The core contract every tool follows
 
@@ -80,15 +85,15 @@ Mutating calls also pass `core/policy.py` (recipient allowlist, required/read-on
 A client may limit one call to some accounts and Drive folders through `_meta["io.github.outcastofmusic.workspace/scope"]` (`core/scope.py`; README "Client scope"). `WorkspaceServer.call_tool` parses it from `context.request_context.meta` and sets the `scope.current` ContextVar, which the tool's worker thread inherits. `GOOGLE_MCP_REQUIRE_SCOPE=1` refuses calls without one.
 
 - **Accounts:** `get_api` (through `_client`) refuses a resolved account outside `accounts` for every call. `fanout.target_accounts`, `list_accounts`, `auth_status` and `whoami` also honor it. Never resolve an account and call Google without `get_api`.
-- **Drive folders:** the Drive, Docs and Sheets servers rebind `register = functools.partial(_register, drive_scoped=True)`. The `drive_scoped` wrapper checks the seven parameters in `runtime.SCOPED_FILE_PARAMS` (and the same keys inside `items`) through the parent chain before the tool runs, refuses `drive_id` and `list_drives`, requires the parent parameter of create tools (`_CREATE_PARENT`), and filters the file lists of `_FILTERED_TOOLS`. A new Drive-family tool must name files only through those seven parameters; a new create tool must be added to `_CREATE_PARENT`, and a new listing tool to `_FILTERED_TOOLS`. Gmail and Calendar tools are never drive-scoped, so their `message_id`/`event_id` are not read as files.
+- **Drive folders:** the Drive, Docs, Sheets and Slides servers rebind `register = functools.partial(_register, drive_scoped=True)`. The `drive_scoped` wrapper checks the eight parameters in `runtime.SCOPED_FILE_PARAMS`, `presentation_id` among them (and the same keys inside `items`), through the parent chain before the tool runs, refuses `drive_id` and `list_drives`, requires the parent parameter of create tools (`_CREATE_PARENT`), and filters the file lists of `_FILTERED_TOOLS`. A new Drive-family tool must name files only through those eight parameters; a new create tool must be added to `_CREATE_PARENT`, and a new listing tool to `_FILTERED_TOOLS`. Gmail and Calendar tools are never drive-scoped, so their `message_id`/`event_id` are not read as files.
 - The folder check uses `runtime.borrow_api`, which holds the Drive client lock only for the check (or reuses it when the tool already holds it), so it cannot deadlock with the tool's own clients.
 - Refusals raise `core.InvalidArgumentError("Outside scope: ...")`. Audit entries carry `scope`.
 
 ## Tests
 
 - `tests/conftest.py` provides `store_env` (points the token store at a temp `~/.google` and clears the api cache) and `write_token` (writes a fake unified token + registers the account). Use these for anything touching auth.
-- Server tests inject a **FakeAPI** (see `test_gmail_server.py`) or `patch("google_auth_core.get_service", ...)` (see `test_sheets_server.py`) — they never hit the network. The FakeAPI's method signatures must stay in sync with the real wrapper; `tests/test_fake_drift.py` enforces parity for hand-written fakes, and calendar/sheets/docs/drive server mocks use `MagicMock(spec=...)`.
-- `test_integration.py` holds the cross-cutting guarantees: multi-account isolation under concurrency, credential persistence across a simulated restart (interactive auth must never run in a server), the read-only gate, and that all five servers expose the common tools. Treat these as the spec.
+- Server tests inject a **FakeAPI** (see `test_gmail_server.py`) or `patch("google_auth_core.get_service", ...)` (see `test_sheets_server.py`) — they never hit the network. The FakeAPI's method signatures must stay in sync with the real wrapper; `tests/test_fake_drift.py` enforces parity for hand-written fakes, calendar/sheets/docs/drive server mocks use `MagicMock(spec=...)`, and the slides server tests use `create_autospec(SlidesAPI, instance=True)`, which also checks call signatures.
+- `test_integration.py` holds the cross-cutting guarantees: multi-account isolation under concurrency, credential persistence across a simulated restart (interactive auth must never run in a server), the read-only gate, and that all six servers expose the common tools. Treat these as the spec.
 
 ## Auth model (important context)
 
