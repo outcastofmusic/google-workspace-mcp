@@ -271,7 +271,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     """``gcal-busy-sync``: run the sync once, or every ``--interval`` minutes."""
     import argparse
     import json
-    import sys
     import time
 
     parser = argparse.ArgumentParser(
