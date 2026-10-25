@@ -1,9 +1,12 @@
 """Google Drive MCP server: search, read, upload, organize, and share files."""
 from __future__ import annotations
 
+import functools
+
 import google_auth_core as core
 
-from ..core import build_server, cap_text, get_api, ok, register, run_tool
+from ..core import build_server, cap_text, get_api, ok, run_tool
+from ..core import register as _register
 from ..core.fanout import fan_out, merged, tag
 from ..core.paths import safe_path
 from .drive_api import DriveAPI
@@ -13,6 +16,10 @@ mcp = build_server(
     "Google Drive: search, read, upload, organize, and share files for one or more Google accounts.",
     service_name="drive",
 )
+
+
+# Every tool here names Drive files, so a client scope's drive_folders limit it.
+register = functools.partial(_register, drive_scoped=True)
 
 
 def _api(account=None):

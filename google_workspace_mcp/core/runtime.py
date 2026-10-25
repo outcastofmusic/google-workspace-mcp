@@ -5,6 +5,7 @@ through these helpers, which is what keeps the five servers aligned.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import math
@@ -21,7 +22,7 @@ import anyio.to_thread
 import google_auth_core as core
 from mcp.types import ToolAnnotations
 
-from . import policy
+from . import policy, scope
 
 
 def _readonly() -> bool:
@@ -150,6 +151,31 @@ def cap_items(
     return kept, meta
 
 
+def _client(
+    service_name: str,
+    factory: Callable[[Optional[str]], Any],
+    account: Optional[str],
+):
+    """Resolve ``account`` and return ``(instance, resolved, client_lock)``.
+
+    Refuses an account outside the call's client scope before any API client
+    is built or used.
+    """
+    # get_credentials and client factories may refresh an expired token and
+    # rewrite its file in place; with tools on worker threads, two calls must
+    # not do that at the same time, so both run under the cache lock.
+    with _lock:
+        _creds, resolved = core.get_credentials(account, service_name=service_name)
+        scope.check_account(resolved)
+        key = (service_name, resolved)
+        inst = _api_cache.get(key)
+        if inst is None:
+            inst = factory(resolved)
+            _api_cache[key] = inst
+        client_lock = _client_locks.setdefault(key, threading.Lock())
+    return inst, resolved, client_lock
+
+
 def get_api(
     service_name: str,
     factory: Callable[[Optional[str]], Any],
@@ -161,21 +187,12 @@ def get_api(
     credentials are missing or unusable. Instances are cached per
     ``(service_name, resolved_account)`` so a long-lived server reuses warm
     authorized clients across calls, and different accounts use different
-    instances and therefore never interfere.
+    instances and therefore never interfere. An account outside the call's
+    client scope is refused (``Outside scope: account ...``).
 
     Returns ``(api_instance, resolved_account)``.
     """
-    # get_credentials and client factories may refresh an expired token and
-    # rewrite its file in place; with tools on worker threads, two calls must
-    # not do that at the same time, so both run under the cache lock.
-    with _lock:
-        _creds, resolved = core.get_credentials(account, service_name=service_name)
-        key = (service_name, resolved)
-        inst = _api_cache.get(key)
-        if inst is None:
-            inst = factory(resolved)
-            _api_cache[key] = inst
-        client_lock = _client_locks.setdefault(key, threading.Lock())
+    inst, resolved, client_lock = _client(service_name, factory, account)
     if _mutating.get():
         policy.check_account(account, resolved)
     held = getattr(_held, "locks", None)
@@ -183,6 +200,27 @@ def get_api(
         client_lock.acquire()
         held.append(client_lock)
     return inst, resolved
+
+
+@contextlib.contextmanager
+def borrow_api(
+    service_name: str,
+    factory: Callable[[Optional[str]], Any],
+    account: Optional[str],
+):
+    """Like :func:`get_api`, but hold the client's lock only inside the block.
+
+    The scope's folder check uses it before a tool runs, so the Drive lock is
+    not kept while the tool takes its own clients; when the tool already holds
+    the lock (filtering a Drive tool's results), it is reused as is.
+    """
+    inst, resolved, client_lock = _client(service_name, factory, account)
+    held = getattr(_held, "locks", None)
+    if held is None or client_lock in held:
+        yield inst, resolved
+        return
+    with client_lock:
+        yield inst, resolved
 
 
 def reset_api_cache() -> None:
@@ -307,9 +345,168 @@ def _policy_scope(fn: Callable, mutating: bool) -> Callable:
             _mutating.reset(token)
             if mutating:
                 account = result.get("account") if isinstance(result, dict) else None
+                sc = scope.get()
                 policy.audit(
-                    fn.__name__, kwargs, account=account or kwargs.get("account"), error=error
+                    fn.__name__, kwargs, account=account or kwargs.get("account"), error=error,
+                    scope=sc.to_dict() if sc is not None else None,
                 )
+
+    return wrapper
+
+
+# Parameters through which Drive, Docs and Sheets tools name files and folders.
+# Only tools registered with drive_scoped=True are checked, so a Gmail
+# message_id or a Calendar event_id is never read as a Drive file.
+SCOPED_FILE_PARAMS = (
+    "file_id", "file_ids", "folder_id", "parent_id", "new_parent_id",
+    "document_id", "spreadsheet_id",
+)
+# Tools that create a file, and the parameter that must name its parent under
+# a folder scope (without one the file lands outside the scope).
+_CREATE_PARENT = {
+    "upload_file": "parent_id",
+    "create_folder": "parent_id",
+    "copy_file": "parent_id",
+    "create_document": "folder_id",
+    "create_document_from_markdown": "folder_id",
+    "create_spreadsheet": "folder_id",
+}
+# Batch tools that create files from ``items``, and each item's parent key.
+_ITEM_CREATE_PARENT = {"batch_create_folders": "parent_id"}
+# Tools whose file lists are cut to the scope after the Google call.
+_FILTERED_TOOLS = frozenset({"search_files", "list_files", "search_files_all_accounts"})
+# Tools that reach beyond any folder by design.
+_REFUSED_TOOLS = frozenset({"list_drives"})
+
+
+def _named_files(kwargs: dict) -> list[tuple[str, str]]:
+    """``(parameter, id)`` for every file or folder a call names, including
+    the same keys inside ``items`` of the batch tools."""
+    out: list[tuple[str, str]] = []
+
+    def add(where: str, value: Any) -> None:
+        values = value if isinstance(value, (list, tuple)) else [value]
+        for v in values:
+            if v is not None and v != "":
+                out.append((where, str(v)))
+
+    for name in SCOPED_FILE_PARAMS:
+        add(name, kwargs.get(name))
+    items = kwargs.get("items")
+    if isinstance(items, list):
+        for i, item in enumerate(items):
+            if isinstance(item, dict):
+                for name in SCOPED_FILE_PARAMS:
+                    add(f"items[{i}].{name}", item.get(name))
+    return out
+
+
+def _drive_client(service: Optional[str], account: Optional[str]):
+    """Borrow the Drive client of the account the tool will resolve to."""
+    from ..drive import drive_api  # lazy: core must not import a service at load
+
+    name = account if account else core.get_default_account(service)
+    return borrow_api("drive", drive_api.DriveAPI, name)
+
+
+def _parents_lookup(api: Any) -> Callable[[str], list]:
+    def lookup(file_id: str) -> list:
+        token = _retry_safe.set(True)  # a metadata read, safe to repeat
+        try:
+            return run_tool(lambda: api.get_parents(file_id))
+        finally:
+            _retry_safe.reset(token)
+
+    return lookup
+
+
+def _check_drive_args(tool: str, service: Optional[str], sc: scope.Scope, kwargs: dict) -> None:
+    """Refuse a Drive, Docs or Sheets call that names anything outside the folders."""
+    if tool in _REFUSED_TOOLS:
+        scope.outside(f"{tool} is not available under a Drive folder scope")
+    if kwargs.get("drive_id"):
+        scope.outside(
+            "drive_id is not allowed under a Drive folder scope; "
+            "pass parent_id or folder_id of a scope folder instead"
+        )
+    param = _CREATE_PARENT.get(tool)
+    if param and not kwargs.get(param):
+        scope.outside(f"{tool} needs {param} set to a folder inside the scope")
+    item_param = _ITEM_CREATE_PARENT.get(tool)
+    if item_param:
+        for i, item in enumerate(kwargs.get("items") or []):
+            if not (isinstance(item, dict) and item.get(item_param)):
+                scope.outside(f"{tool} needs items[{i}].{item_param} set to a folder inside the scope")
+    named = _named_files(kwargs)
+    if not named:
+        return
+    with _drive_client(service, kwargs.get("account")) as (api, resolved):
+        folders = sc.folder_ids(resolved)
+        lookup = _parents_lookup(api)
+        for where, file_id in named:
+            if not scope.in_folders(resolved, file_id, folders, lookup):
+                scope.outside(
+                    f"file {file_id} ({where}) is not inside the scope's Drive folders for {resolved}"
+                )
+
+
+def _keep_files(sc: scope.Scope, service: Optional[str], account: str, files: list) -> list:
+    """The files of ``account`` that lie inside the scope's folders."""
+    folders = sc.folder_ids(account)
+    if not folders or not files:
+        return []
+    kept = []
+    with _drive_client(service, account) as (api, resolved):
+        lookup = _parents_lookup(api)
+        for f in files:
+            file_id = f.get("id") if isinstance(f, dict) else None
+            if not file_id:
+                continue
+            if "parents" in f:
+                scope.remember(resolved, file_id, f.get("parents") or ())
+            try:
+                inside = scope.in_folders(resolved, file_id, folders, lookup)
+            except core.GoogleCoreError:
+                inside = False
+            if inside:
+                kept.append(f)
+    return kept
+
+
+def _filter_files(tool: str, service: Optional[str], sc: scope.Scope, result: Any) -> Any:
+    if tool not in _FILTERED_TOOLS or not isinstance(result, dict):
+        return result
+    if tool == "search_files_all_accounts":
+        files = result.get("data") or []
+        kept_ids = set()
+        for account in sorted({f.get("account") for f in files if f.get("account")}):
+            mine = [f for f in files if f.get("account") == account]
+            kept_ids.update(id(f) for f in _keep_files(sc, service, account, mine))
+        return {**result, "data": [f for f in files if id(f) in kept_ids]}
+    data = result.get("data")
+    account = result.get("account")
+    if not isinstance(data, dict) or not account:
+        return result
+    files = _keep_files(sc, service, account, data.get("files") or [])
+    return {**result, "data": {**data, "files": files}}
+
+
+def _drive_scope(fn: Callable, service: Optional[str], mutating: bool) -> Callable:
+    """Wrap a Drive, Docs or Sheets tool so a folder scope limits the files it
+    names, creates and returns. Mutating calls also drop the cached parents of
+    every file they name, since a move or trash changes them."""
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            sc = scope.get()
+            if sc is None or sc.folders is None:
+                return fn(*args, **kwargs)
+            _check_drive_args(fn.__name__, service, sc, kwargs)
+            return _filter_files(fn.__name__, service, sc, fn(*args, **kwargs))
+        finally:
+            if mutating:
+                scope.forget(fid for _where, fid in _named_files(kwargs))
 
     return wrapper
 
@@ -350,6 +547,7 @@ def register(
     idempotent: bool | None = None,
     open_world: bool = False,
     core: bool = False,
+    drive_scoped: bool = False,
 ):
     """Decorator that registers a tool, honoring the read-only gate and
     attaching MCP ToolAnnotations derived from the same flags.
@@ -358,6 +556,9 @@ def register(
     so they never appear in ``list_tools``. Destructive tools get a clear marker
     appended to their description. With ``GOOGLE_MCP_TOOLSET=core`` only tools
     tagged ``core=True`` are registered.
+
+    ``drive_scoped`` (set by the Drive, Docs and Sheets servers) makes a client
+    scope's ``drive_folders`` limit the files the tool names, creates and lists.
     """
 
     def deco(fn: Callable) -> Callable:
@@ -380,8 +581,11 @@ def register(
             openWorldHint=open_world,
         )
         retry_safe = not mutating or idempotent is True
+        inner = fn
+        if drive_scoped:
+            inner = _drive_scope(fn, getattr(mcp, "workspace_service", None), mutating)
         mcp.tool(annotations=annotations)(
-            _off_loop(_policy_scope(_retry_scope(fn, retry_safe), mutating))
+            _off_loop(_policy_scope(_retry_scope(inner, retry_safe), mutating))
         )
         return fn  # direct callers keep the plain sync function
 

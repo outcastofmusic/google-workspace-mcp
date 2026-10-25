@@ -15,11 +15,17 @@ from typing import Any, Callable, Optional
 
 import google_auth_core as core
 
+from . import scope
 from .runtime import get_api, run_tool
 
 
 def target_accounts(accounts: Optional[list[str]]) -> list[str]:
-    """Resolve ``accounts`` (emails or aliases), or every configured account."""
+    """Resolve ``accounts`` (emails or aliases), or every configured account.
+
+    Under a client scope with ``accounts``, the default list holds only the
+    scoped accounts; an explicitly named account outside it stays in the list
+    so ``get_api`` refuses it and the caller reports why.
+    """
     names = accounts if accounts else core.list_accounts()
     resolved = set()
     for name in names:
@@ -27,6 +33,8 @@ def target_accounts(accounts: Optional[list[str]]) -> list[str]:
             resolved.add(core.resolve_account(name))
         except Exception:  # noqa: BLE001 - get_api reports the unknown account
             resolved.add(name)
+    if not accounts:
+        return sorted(scope.filter_accounts(resolved))
     return sorted(resolved)
 
 

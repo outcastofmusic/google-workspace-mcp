@@ -6,7 +6,7 @@ import re
 import google_auth_core as core
 from google.auth.transport.requests import Request as GoogleAuthRequest
 
-from ..drive.drive_api import DriveAPI
+from ..drive.drive_api import DriveAPI, place_in_folder
 
 # Width heuristic for the default Sheets font (Arial 10):
 # ~7 px per character plus ~14 px of cell padding/border.
@@ -110,8 +110,15 @@ class SheetsAPI:
         ).execute()
 
     # --- spreadsheet / structure ---
-    def create_spreadsheet(self, title):
-        return self.service.spreadsheets().create(body={"properties": {"title": title}}).execute()
+    def create_spreadsheet(self, title, folder_id=None):
+        """Create a spreadsheet; with ``folder_id``, move it there (trashed if the move fails)."""
+        created = self.service.spreadsheets().create(
+            body={"properties": {"title": title}}
+        ).execute()
+        if folder_id:
+            drive = core.get_service("drive", "v3", account=self.account)
+            place_in_folder(drive, created["spreadsheetId"], folder_id)
+        return created
 
     def get_spreadsheet(self, spreadsheet_id, include_grid_data=False):
         return self.service.spreadsheets().get(

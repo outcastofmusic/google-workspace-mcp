@@ -201,6 +201,33 @@ def _download_to_file(request, path: str) -> int:
         raise
 
 
+def place_in_folder(drive_service, file_id: str, folder_id: str) -> None:
+    """Move a file just created elsewhere (Docs and Sheets create calls cannot
+    set a parent) into ``folder_id``.
+
+    If the move fails, the new file is trashed and the error re-raised, so a
+    failed call leaves nothing behind outside the folder.
+    """
+    files = drive_service.files()
+    try:
+        meta = files.get(fileId=file_id, fields="parents", supportsAllDrives=True).execute()
+        files.update(
+            fileId=file_id,
+            addParents=folder_id,
+            removeParents=",".join(meta.get("parents") or []),
+            fields="id, parents",
+            supportsAllDrives=True,
+        ).execute()
+    except Exception:
+        try:
+            files.update(
+                fileId=file_id, body={"trashed": True}, supportsAllDrives=True
+            ).execute()
+        except Exception:  # noqa: BLE001 - report the move failure, not the cleanup
+            pass
+        raise
+
+
 class DriveAPI:
     def __init__(self, account=None):
         self.account = account
@@ -287,6 +314,12 @@ class DriveAPI:
         return self._files().get(
             **self._all_drives(fileId=file_id, fields=FILE_METADATA_FIELDS)
         ).execute()
+
+    def get_parents(self, file_id: str) -> list:
+        """Parent folder ids of a file as this account sees them ([] for a root
+        or a file only shared with the account). Used by the client scope."""
+        meta = self._files().get(**self._all_drives(fileId=file_id, fields="id,parents")).execute()
+        return list(meta.get("parents") or [])
 
     def download_file(self, file_id: str, output_path: str | None = None):
         meta = self.get_file(file_id)
