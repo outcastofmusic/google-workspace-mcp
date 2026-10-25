@@ -18,7 +18,8 @@ change it with ``monkeypatch.setenv``.
   links are refused too, unless ``GOOGLE_MCP_ALLOW_IMPLICIT_RECIPIENTS=1``
   (replies and drafts only; "anyone" links stay refused).
 - ``GOOGLE_MCP_AUDIT_LOG``: path of a JSON-lines file; every mutating call is
-  appended with time, tool, account, arguments (long strings cut), and outcome.
+  appended with time, tool, account, arguments (long strings cut), the client
+  scope it ran under (see ``core/scope.py``), and outcome.
 """
 
 from __future__ import annotations
@@ -173,8 +174,18 @@ def _redact(value: Any) -> Any:
     return value
 
 
-def audit(tool: str, kwargs: dict, *, account: Optional[str], error: Optional[BaseException]) -> None:
-    """Append one JSON line per mutating call to ``GOOGLE_MCP_AUDIT_LOG``."""
+def audit(
+    tool: str,
+    kwargs: dict,
+    *,
+    account: Optional[str],
+    error: Optional[BaseException],
+    scope: Optional[dict] = None,
+) -> None:
+    """Append one JSON line per mutating call to ``GOOGLE_MCP_AUDIT_LOG``.
+
+    ``scope`` is the client scope the call ran under (``null`` without one).
+    """
     path = os.getenv("GOOGLE_MCP_AUDIT_LOG", "").strip()
     if not path:
         return
@@ -183,6 +194,7 @@ def audit(tool: str, kwargs: dict, *, account: Optional[str], error: Optional[Ba
         "tool": tool,
         "account": account,
         "args": _redact({k: v for k, v in kwargs.items() if k != "account"}),
+        "scope": scope,
         "ok": error is None,
     }
     if error is not None:

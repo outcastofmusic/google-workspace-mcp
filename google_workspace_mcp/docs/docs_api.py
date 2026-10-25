@@ -8,7 +8,7 @@ from urllib.parse import quote as url_quote
 import google_auth_core as core
 from googleapiclient.http import MediaIoBaseUpload
 
-from ..drive.drive_api import DriveAPI
+from ..drive.drive_api import DriveAPI, place_in_folder
 
 PAGE_PRESETS = {
     "LETTER": (612, 792),
@@ -92,8 +92,12 @@ class DocsAPI:
     def _size_pt(self, width, height):
         return {"width": self._pt(width), "height": self._pt(height)}
 
-    def create_document(self, title):
-        return self.service.documents().create(body={"title": title}).execute()
+    def create_document(self, title, folder_id=None):
+        """Create an empty Doc; with ``folder_id``, move it there (trashed if the move fails)."""
+        created = self.service.documents().create(body={"title": title}).execute()
+        if folder_id:
+            place_in_folder(self._drive(), created["documentId"], folder_id)
+        return created
 
     def get_document(self, document_id):
         return self.service.documents().get(documentId=document_id).execute()

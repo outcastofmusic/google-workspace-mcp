@@ -303,6 +303,34 @@ An agent reads untrusted content and may follow instructions hidden in it. These
 
 A refused call returns an error starting `Blocked by policy:` that names the setting involved.
 
+### Client scope
+
+A client that serves several projects from one server process can limit each tool call to some accounts and some Drive folders. The client, not the model, puts the scope in the request's `_meta` under the key `io.github.outcastofmusic.workspace/scope`; the model writes only the tool arguments, so no argument can reach outside the scope. A `tools/call` request with a scope:
+
+```json
+{
+  "name": "read_file_text",
+  "arguments": {"file_id": "1AbC..."},
+  "_meta": {
+    "io.github.outcastofmusic.workspace/scope": {
+      "accounts": ["work"],
+      "drive_folders": [{"account": "me@work.com", "id": "0BwDdbFolderId"}]
+    }
+  }
+}
+```
+
+Both parts are optional, and each limits only when present:
+
+- `accounts` (emails or aliases): every tool refuses an account outside the list, reads as well as writes. Tools that span accounts (`*_all_accounts`, `sync_busy_blocks`) use only the listed accounts, and `list_accounts` lists only them.
+- `drive_folders` (`{account, id}` pairs): Drive, Docs and Sheets tools refuse any `file_id`, `file_ids`, `folder_id`, `parent_id`, `new_parent_id`, `document_id` or `spreadsheet_id` that is not one of the account's scope folders or below one through its parent folders (also inside the `items` of the batch tools). A file only shared with the user has no parent in the account's view, so it is outside. `list_drives`, `list_changes` (which lists changes across the whole Drive, file names included) and a `drive_id` argument are refused. `search_files`, `list_files` and `search_files_all_accounts` return only files inside the scope, so a page may hold fewer than `page_size` files while `next_page_token` still continues. Tools that create a file must name a parent inside the scope: `parent_id` for `upload_file`, `create_folder`, `copy_file` and `batch_create_folders` items, `folder_id` for `create_document`, `create_document_from_markdown` and `create_spreadsheet`. Gmail and Calendar tools are limited by `accounts` only.
+
+A refused call returns an error starting `Outside scope:` that names the account, file or missing parameter. A scope of the wrong shape fails the call with an error naming the problem. A call without a scope behaves as before; set `GOOGLE_MCP_REQUIRE_SCOPE=1` to refuse such calls when every client is known to send one. With `GOOGLE_MCP_AUDIT_LOG` set, each entry records the call's `scope` (`null` without one).
+
+Cost: the folder check reads a file's parents with one Drive `files.get` (fields `id,parents`) per ancestor not yet cached. Parents are cached per account for 10 minutes, at most 5,000 entries, and dropped for any file this server moves or trashes; a move made elsewhere is seen after at most 10 minutes. A scoped search over a large Drive can return sparse pages, so search with `parent_id` of a scope folder, or use `list_folder_tree`.
+
+Over stdio the scope is as trustworthy as the process that started the server. Over HTTP it is only as trustworthy as whoever can connect.
+
 ## Smaller tool set
 
 The full servers expose about 190 tools, and every tool schema costs agent

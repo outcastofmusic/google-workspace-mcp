@@ -1,9 +1,11 @@
 """Google Docs MCP server: create, read, and edit documents for one or more accounts."""
 from __future__ import annotations
 
+import functools
 import json
 
-from ..core import build_server, cap_items, cap_text, get_api, ok, register, run_tool
+from ..core import build_server, cap_items, cap_text, get_api, ok, run_tool
+from ..core import register as _register
 from .docs_api import DocsAPI
 
 mcp = build_server(
@@ -16,6 +18,10 @@ mcp = build_server(
     "get_content_map and pass it as required_revision_id.",
     service_name="docs",
 )
+
+
+# Every tool here names Drive files, so a client scope's drive_folders limit it.
+register = functools.partial(_register, drive_scoped=True)
 
 
 def _api(account=None):
@@ -130,10 +136,10 @@ def find_text(
 
 # --- write ---
 @register(mcp, mutating=True)
-def create_document(account: str | None = None, *, title: str) -> dict:
-    """Create a new (empty) Google Doc with the given title."""
+def create_document(account: str | None = None, *, title: str, folder_id: str | None = None) -> dict:
+    """Create a new (empty) Google Doc with the given title, optionally inside folder_id."""
     api, resolved = _api(account)
-    return ok(resolved, run_tool(lambda: api.create_document(title)))
+    return ok(resolved, run_tool(lambda: api.create_document(title, folder_id)))
 
 
 @register(mcp, mutating=True, core=True)

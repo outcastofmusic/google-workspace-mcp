@@ -1,11 +1,13 @@
 """Google Sheets MCP server: read/write values and manage sheet structure."""
 from __future__ import annotations
 
+import functools
 import json
 
 from google_auth_core import InvalidArgumentError
 
-from ..core import DEFAULT_MAX_CHARS, build_server, cap_items, get_api, ok, register, run_tool
+from ..core import DEFAULT_MAX_CHARS, build_server, cap_items, get_api, ok, run_tool
+from ..core import register as _register
 from .sheets_api import SheetsAPI
 
 mcp = build_server(
@@ -16,6 +18,10 @@ mcp = build_server(
     "wrapped long text, alternating row colors. Do not freeze rows/columns unless the user asks.",
     service_name="sheets",
 )
+
+
+# Every tool here names Drive files, so a client scope's drive_folders limit it.
+register = functools.partial(_register, drive_scoped=True)
 
 
 def _api(account=None):
@@ -94,10 +100,10 @@ def batch_read(account: str | None = None, *, spreadsheet_id: str, ranges: list[
 # --- WRITE (mutating) tools ---
 
 @register(mcp, mutating=True, core=True)
-def create_spreadsheet(account: str | None = None, *, title: str) -> dict:
-    """Create a new Google Spreadsheet with the given title and return its metadata."""
+def create_spreadsheet(account: str | None = None, *, title: str, folder_id: str | None = None) -> dict:
+    """Create a new Google Spreadsheet with the given title (optionally inside folder_id) and return its metadata."""
     api, resolved = _api(account)
-    data = run_tool(lambda: api.create_spreadsheet(title))
+    data = run_tool(lambda: api.create_spreadsheet(title, folder_id))
     return ok(resolved, data)
 
 
