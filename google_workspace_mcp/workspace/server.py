@@ -1,14 +1,14 @@
-"""All five Workspace servers in one process -> gworkspace-mcp.
+"""All six Workspace servers in one process -> gworkspace-mcp.
 
 Each server is its own Python process, and almost all of a process's memory is
 the shared stack (mcp SDK, googleapiclient, google-auth-core), not the tools:
-five servers cost ~450MB, one process with every tool ~130MB. Clients start a
+the five servers before Slides cost ~450MB, one process with every tool ~130MB. Clients start a
 full set per window, so this is the entry point to configure when you want
-Gmail, Calendar, Sheets, Docs and Drive together.
+Gmail, Calendar, Sheets, Docs, Drive and Slides together.
 
-Tools are taken from the five server modules as they are, so behavior, the
+Tools are taken from the six server modules as they are, so behavior, the
 read-only gate and the toolset filter stay identical. Names that two servers
-share (list_changes, add_comment, batch_update, ...) get the service as prefix,
+share (list_changes, add_comment, batch_update, replace_all_text, ...) get the service as prefix,
 e.g. ``drive_list_changes``; unique names are kept. The common account tools
 are registered once.
 """
@@ -22,12 +22,14 @@ from ..docs import server as docs
 from ..drive import server as drive
 from ..gmail import server as gmail
 from ..sheets import server as sheets
+from ..slides import server as slides
 
-_SERVICES = {"gmail": gmail, "calendar": calendar, "sheets": sheets, "docs": docs, "drive": drive}
+_SERVICES = {"gmail": gmail, "calendar": calendar, "sheets": sheets, "docs": docs, "drive": drive,
+             "slides": slides}
 
 mcp = build_server(
     "gworkspace-mcp",
-    "Google Workspace (Gmail, Calendar, Sheets, Docs, Drive) for one or more Google accounts.\n\n"
+    "Google Workspace (Gmail, Calendar, Sheets, Docs, Drive, Slides) for one or more Google accounts.\n\n"
     + "\n\n".join(m.mcp.instructions for m in _SERVICES.values() if m.mcp.instructions),
 )
 

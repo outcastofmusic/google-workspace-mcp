@@ -196,6 +196,7 @@ def test_mutating_tools_present_by_default():
     [
         ("docs", "read_document", "create_document"),
         ("drive", "list_files", "upload_file"),
+        ("slides", "read_presentation", "create_presentation_from_outline"),
     ],
 )
 def test_readonly_gate_hides_mutating_tools_docs_drive(pkg, read_tool, write_tool):
@@ -240,6 +241,10 @@ _CORE_TOOLSET = {
         "search_files", "list_files", "get_file", "read_file_text", "download_file",
         "export_file", "upload_file", "create_folder", "move_file", "rename_file", "copy_file",
         "share_file", "trash_file",
+    },
+    "slides": {
+        "read_presentation", "create_presentation_from_outline", "add_slides",
+        "update_slide_text",
     },
 }
 _COMMON = {"list_accounts", "whoami", "auth_status"}
@@ -302,8 +307,9 @@ async def test_all_servers_expose_common_tools():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
-    for mod in (g, c, s, d, dr):
+    for mod in (g, c, s, d, dr, sl):
         names = {t.name for t in await mod.mcp.list_tools()}
         assert {"list_accounts", "whoami", "auth_status"}.issubset(names)
 
@@ -326,6 +332,8 @@ async def test_workspace_server_carries_every_tool_unchanged():
             )
     assert "list_changes" not in combined
     assert {"gmail_list_changes", "drive_list_changes"}.issubset(combined)
+    assert {"read_presentation", "create_presentation_from_outline", "slides_batch_update",
+            "slides_replace_all_text", "docs_replace_all_text"}.issubset(combined)
 
 
 @pytest.mark.anyio
@@ -335,12 +343,13 @@ async def test_contact_search_on_gmail_and_calendar_only():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
     for mod in (g, c):
         tool = _tool_by_name(await mod.mcp.list_tools(), "search_contacts")
         assert tool.annotations.read_only_hint is True
         assert tool.input_schema["required"] == ["query"]
-    for mod in (s, d, dr):
+    for mod in (s, d, dr, sl):
         names = {t.name for t in await mod.mcp.list_tools()}
         assert "search_contacts" not in names
 
@@ -379,6 +388,7 @@ async def test_annotations_read_vs_destructive():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
     cases = [
         (g, "get_profile", "delete_message"),
@@ -386,6 +396,7 @@ async def test_annotations_read_vs_destructive():
         (s, "read_range", "delete_sheet"),
         (d, "read_document", "delete_range"),
         (dr, "search_files", "delete_file"),
+        (sl, "read_presentation", "delete_slide"),
     ]
     for mod, read_tool, destructive_tool in cases:
         tools = await mod.mcp.list_tools()
@@ -408,6 +419,7 @@ async def test_required_ids_are_required_in_schema():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
     cases = [
         (g, "get_message", {"message_id"}, "format"),
@@ -430,6 +442,14 @@ async def test_required_ids_are_required_in_schema():
         (s, "update_range", {"spreadsheet_id", "range", "values"}, "value_input_option"),
         (d, "create_document", {"title"}, "folder_id"),
         (s, "create_spreadsheet", {"title"}, "folder_id"),
+        (sl, "read_presentation", {"presentation_id"}, "max_chars"),
+        (sl, "create_presentation", {"title"}, "folder_id"),
+        (sl, "create_presentation_from_outline", {"title", "slides"}, "folder_id"),
+        (sl, "add_slides", {"presentation_id", "slides"}, "position"),
+        (sl, "update_slide_text", {"presentation_id", "slide_id"}, "revision_id"),
+        (sl, "replace_all_text", {"presentation_id", "find"}, "replace"),
+        (sl, "delete_slide", {"presentation_id", "slide_id"}, "revision_id"),
+        (sl, "batch_update", {"presentation_id", "requests"}, "revision_id"),
     ]
     for mod, name, required, optional in cases:
         schema = _tool_by_name(await mod.mcp.list_tools(), name).input_schema
@@ -446,6 +466,7 @@ async def test_annotations_mutating_not_destructive():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
     cases = [
         (g, "create_draft"),
@@ -453,6 +474,7 @@ async def test_annotations_mutating_not_destructive():
         (s, "update_range"),
         (d, "append_text"),
         (dr, "upload_file"),
+        (sl, "add_slides"),
     ]
     for mod, write_tool in cases:
         tools = await mod.mcp.list_tools()
@@ -469,8 +491,9 @@ async def test_common_tools_readonly_hint():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
-    for mod in (g, c, s, d, dr):
+    for mod in (g, c, s, d, dr, sl):
         tools = await mod.mcp.list_tools()
         for name in ("list_accounts", "whoami", "auth_status"):
             ann = _tool_by_name(tools, name).annotations
@@ -485,8 +508,9 @@ async def test_no_output_schema_regression():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
-    for mod in (g, c, s, d, dr):
+    for mod in (g, c, s, d, dr, sl):
         tools = await mod.mcp.list_tools()
         for tool in tools:
             assert tool.output_schema is None, tool.name
@@ -561,12 +585,14 @@ async def test_outward_and_overwrite_tools_are_destructive():
     from google_workspace_mcp.drive import server as dr
     from google_workspace_mcp.gmail import server as g
     from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
 
     cases = [
         (g, "send_message", True), (g, "reply_to_message", True), (g, "forward_message", True),
         (g, "send_draft", True), (g, "create_filter", True), (g, "block_sender", False),
         (dr, "share_file", True), (dr, "unshare_file", False), (dr, "update_file_content", False),
-        (d, "batch_update", False), (s, "batch_update", False),
+        (d, "batch_update", False), (s, "batch_update", False), (sl, "batch_update", False),
+        (sl, "update_slide_text", False), (sl, "replace_all_text", False),
     ]
     for mod, name, open_world in cases:
         ann = _tool_by_name(await mod.mcp.list_tools(), name).annotations
