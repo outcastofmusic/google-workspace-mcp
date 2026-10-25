@@ -117,3 +117,39 @@ class CalendarChangesAPI(CalendarAPI):
             spec["properties_key"]: properties,
         }
         return self.service.events().insert(calendarId=calendar_id, body=event).execute()
+
+    # --- raw access for busy-block sync (calendar/busy_sync.py) ---------------
+
+    def list_window_events(self, calendar_id, time_min, time_max):
+        """Every event instance overlapping [time_min, time_max), all pages."""
+        items, token = [], None
+        while True:
+            params = {
+                "calendarId": calendar_id,
+                "timeMin": time_min,
+                "timeMax": time_max,
+                "singleEvents": True,
+                "showDeleted": False,
+                "maxResults": 2500,
+            }
+            if token:
+                params["pageToken"] = token
+            result = self.service.events().list(**params).execute()
+            items.extend(result.get("items", []))
+            token = result.get("nextPageToken")
+            if not token:
+                return items
+
+    def insert_busy_block(self, calendar_id, body):
+        return self.service.events().insert(calendarId=calendar_id, body=body).execute()
+
+    def patch_busy_block(self, calendar_id, event_id, body):
+        return (
+            self.service.events()
+            .patch(calendarId=calendar_id, eventId=event_id, body=body)
+            .execute()
+        )
+
+    def delete_busy_block(self, calendar_id, event_id):
+        self.service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+        return True

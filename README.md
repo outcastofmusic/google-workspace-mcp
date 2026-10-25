@@ -230,6 +230,33 @@ Three read tools query every configured account in one call and merge the result
 
 Every item carries an `account` key. An account that fails appears under `errors`; the other accounts still return.
 
+## Busy-time sync across calendars
+
+Each calendar only knows its own meetings, so people booking your work calendar cannot see your personal appointments. `sync_busy_blocks` (Calendar server) and the `gcal-busy-sync` command mirror busy time: every busy event on one account's primary calendar becomes a private "Busy" block on the primary calendars of all your other accounts.
+
+- **Only the time slot is copied.** A block has no title, description, location or attendees from its source, and its visibility is private.
+- **Real events are never changed.** Blocks carry a private marker; the sync creates, moves and deletes only marked events, and never treats a block as a source.
+- **Skipped:** free (transparent) events, declined invitations, cancelled events, working-location events and, unless `include_all_day` is set, all-day events. A meeting already on a calendar gets no block there.
+- **Window:** now to `days_ahead` days ahead (default 14, maximum 90).
+- **Failure-safe:** if any account cannot be listed, that run creates and moves blocks but deletes none.
+
+Run it once to check the plan, then on a schedule:
+
+```bash
+gcal-busy-sync --dry-run                 # show what would change
+gcal-busy-sync                           # sync once (all accounts)
+gcal-busy-sync --accounts work personal  # only these accounts
+gcal-busy-sync --interval 10             # keep running, sync every 10 minutes
+```
+
+Scheduled with cron (every 10 minutes):
+
+```
+*/10 * * * * /path/to/gcal-busy-sync >> ~/.gcal-busy-sync.log 2>&1
+```
+
+Use the absolute path from `which gcal-busy-sync`; cron does not load your shell PATH. On macOS, a launchd agent with `StartInterval` 600 does the same while you are logged in.
+
 ## Read-only mode
 
 Set `GOOGLE_MCP_READONLY=1` in a server's environment to hide every mutating
