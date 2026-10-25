@@ -2,13 +2,16 @@
 
 ## 1. Server and API wrapper
 
-- [ ] 1.1 Add `slides/slides_api.py` (`SlidesAPI` on Slides v1 through `core.get_service`): read, create, outline build, add slides, update slide text, replace all text, delete slide, batch update, all writes with `requiredRevisionId`. Verify: unit tests with a mocked service check the batch requests for an outline with nested bullets, notes and a `TITLE` slide, and the move into `folder_id` with trash on failure.
-- [ ] 1.2 Add `slides/server.py` with the eight tools on the tool contract, `drive_scoped=True`, `core=True` on the four the proposal names, destructive marks as listed; entry point `gslides-mcp`; register the module in `gworkspace-mcp`. Verify: `tests/test_slides_server.py` with `MagicMock(spec=SlidesAPI)` for each tool, the Read-only mode scenario, the drift test, `test_required_ids_are_required_in_schema`, and the integration test's list of servers.
-- [ ] 1.3 `read_presentation` text, layouts and the character budget. Verify: the Long deck scenario on a fixture deck JSON, and an unknown-layout error naming the layouts.
+- [x] 1.1 Add `slides/slides_api.py` (`SlidesAPI` on Slides v1 through `core.get_service`): read, create, outline build, add slides, update slide text, replace all text, delete slide, batch update, all writes with `requiredRevisionId`. Verify: unit tests with a mocked service check the batch requests for an outline with nested bullets, notes and a `TITLE` slide, and the move into `folder_id` with trash on failure.
+  Note: notes need a second batch (design, 2026-10-25 apply); the test checks both batches.
+- [x] 1.2 Add `slides/server.py` with the eight tools on the tool contract, `drive_scoped=True`, `core=True` on the four the proposal names, destructive marks as listed; entry point `gslides-mcp`; register the module in `gworkspace-mcp`. Verify: `tests/test_slides_server.py` with `MagicMock(spec=SlidesAPI)` for each tool, the Read-only mode scenario, the drift test, `test_required_ids_are_required_in_schema`, and the integration test's list of servers.
+  Note: the drift test covers hand-written fakes only; the Slides tests use `create_autospec(SlidesAPI)`, which fails a tool call whose arguments do not fit the real signature, so no pair was added. Adding the server renames Docs' `replace_all_text` to `docs_replace_all_text` in `gworkspace-mcp` (design, Risks).
+- [x] 1.3 `read_presentation` text, layouts and the character budget. Verify: the Long deck scenario on a fixture deck JSON, and an unknown-layout error naming the layouts.
+  Note: paging uses `offset`/`next_offset` like the other read tools (design, 2026-10-25 apply).
 
 ## 2. Scope
 
-- [ ] 2.1 Add `presentation_id` to `SCOPED_FILE_PARAMS` and the two create tools to `_CREATE_PARENT`. Verify: scope tests for the Deck outside the project scenario, a create without `folder_id` under a scope, and a create inside it.
+- [x] 2.1 Add `presentation_id` to `SCOPED_FILE_PARAMS` and the two create tools to `_CREATE_PARENT`. Verify: scope tests for the Deck outside the project scenario, a create without `folder_id` under a scope, and a create inside it.
 
 ## 3. Docs and gates
 

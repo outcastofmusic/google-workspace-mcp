@@ -354,12 +354,12 @@ def _policy_scope(fn: Callable, mutating: bool) -> Callable:
     return wrapper
 
 
-# Parameters through which Drive, Docs and Sheets tools name files and folders.
+# Parameters through which Drive, Docs, Sheets and Slides tools name files and folders.
 # Only tools registered with drive_scoped=True are checked, so a Gmail
 # message_id or a Calendar event_id is never read as a Drive file.
 SCOPED_FILE_PARAMS = (
     "file_id", "file_ids", "folder_id", "parent_id", "new_parent_id",
-    "document_id", "spreadsheet_id",
+    "document_id", "spreadsheet_id", "presentation_id",
 )
 # Tools that create a file, and the parameter that must name its parent under
 # a folder scope (without one the file lands outside the scope).
@@ -370,6 +370,8 @@ _CREATE_PARENT = {
     "create_document": "folder_id",
     "create_document_from_markdown": "folder_id",
     "create_spreadsheet": "folder_id",
+    "create_presentation": "folder_id",
+    "create_presentation_from_outline": "folder_id",
 }
 # Batch tools that create files from ``items``, and each item's parent key.
 _ITEM_CREATE_PARENT = {"batch_create_folders": "parent_id"}
@@ -422,7 +424,7 @@ def _parents_lookup(api: Any) -> Callable[[str], list]:
 
 
 def _check_drive_args(tool: str, service: Optional[str], sc: scope.Scope, kwargs: dict) -> None:
-    """Refuse a Drive, Docs or Sheets call that names anything outside the folders."""
+    """Refuse a Drive, Docs, Sheets or Slides call that names anything outside the folders."""
     if tool in _REFUSED_TOOLS:
         scope.outside(f"{tool} is not available under a Drive folder scope")
     if kwargs.get("drive_id"):
@@ -493,7 +495,7 @@ def _filter_files(tool: str, service: Optional[str], sc: scope.Scope, result: An
 
 
 def _drive_scope(fn: Callable, service: Optional[str], mutating: bool) -> Callable:
-    """Wrap a Drive, Docs or Sheets tool so a folder scope limits the files it
+    """Wrap a Drive, Docs, Sheets or Slides tool so a folder scope limits the files it
     names, creates and returns. Mutating calls also drop the cached parents of
     every file they name, since a move or trash changes them."""
 
@@ -558,7 +560,7 @@ def register(
     appended to their description. With ``GOOGLE_MCP_TOOLSET=core`` only tools
     tagged ``core=True`` are registered.
 
-    ``drive_scoped`` (set by the Drive, Docs and Sheets servers) makes a client
+    ``drive_scoped`` (set by the Drive, Docs, Sheets and Slides servers) makes a client
     scope's ``drive_folders`` limit the files the tool names, creates and lists.
     """
 

@@ -25,6 +25,8 @@ from google_workspace_mcp.drive.drive_api import DriveAPI
 from google_workspace_mcp.gmail import server as gmail_server
 from google_workspace_mcp.sheets import server as sheets_server
 from google_workspace_mcp.sheets.sheets_api import SheetsAPI
+from google_workspace_mcp.slides import server as slides_server
+from google_workspace_mcp.slides.slides_api import SlidesAPI
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -539,6 +541,41 @@ async def test_create_spreadsheet_in_the_project_folder(drive, monkeypatch):
     fake.create_spreadsheet.assert_called_once_with("t", "DDB")
     # Without a scope, folder_id is optional as before.
     assert env(await call(sheets_server.mcp, "create_spreadsheet", {"title": "t"}))["ok"]
+
+
+async def test_deck_outside_the_project(drive, monkeypatch):
+    """Scenario: read_presentation on a deck in doValue/ under a DDB scope."""
+    fake = MagicMock(spec=SlidesAPI)
+    fake.read_presentation.return_value = {"presentationId": "doc_specs", "slides": []}
+    monkeypatch.setattr(slides_server, "_api", lambda account=None: (fake, "me@work.com"))
+    res = await call(slides_server.mcp, "read_presentation", {"presentation_id": "doc_dovalue"}, DDB)
+    assert res.is_error and "Outside scope: file doc_dovalue (presentation_id)" in text(res)
+    fake.read_presentation.assert_not_called()
+    assert env(await call(slides_server.mcp, "read_presentation",
+                          {"presentation_id": "doc_specs"}, DDB))["ok"]
+    res = await call(slides_server.mcp, "update_slide_text",
+                     {"presentation_id": "doc_dovalue", "slide_id": "s", "title": "x"}, DDB)
+    assert res.is_error and "doc_dovalue (presentation_id)" in text(res)
+    fake.update_slide_text.assert_not_called()
+
+
+@pytest.mark.parametrize("tool, args", [
+    ("create_presentation", {"title": "t"}),
+    ("create_presentation_from_outline", {"title": "t", "slides": [{"title": "a"}]}),
+])
+async def test_slides_create_needs_folder_id_in_scope(drive, monkeypatch, tool, args):
+    fake = MagicMock(spec=SlidesAPI)
+    getattr(fake, tool).return_value = {"presentationId": "P"}
+    monkeypatch.setattr(slides_server, "_api", lambda account=None: (fake, "me@work.com"))
+    res = await call(slides_server.mcp, tool, args, DDB)
+    assert res.is_error and f"Outside scope: {tool} needs folder_id" in text(res)
+    res = await call(slides_server.mcp, tool, {**args, "folder_id": "doValue"}, DDB)
+    assert res.is_error and "doValue (folder_id)" in text(res)
+    getattr(fake, tool).assert_not_called()
+    assert env(await call(slides_server.mcp, tool, {**args, "folder_id": "specs"}, DDB))["ok"]
+    assert getattr(fake, tool).call_args.args[-1] == "specs"
+    # Without a scope, folder_id stays optional.
+    assert env(await call(slides_server.mcp, tool, args))["ok"]
 
 
 def _with_drive(monkeypatch, primary_name):
