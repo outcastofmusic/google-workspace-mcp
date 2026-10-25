@@ -661,3 +661,21 @@ async def test_combined_server_keeps_the_folder_check(drive):
     res = await call(workspace.mcp, "read_file_text", {"file_id": "doc_dovalue"}, DDB)
     assert res.is_error and "Outside scope: file doc_dovalue" in text(res)
     drive.read_file_text.assert_not_called()
+
+
+async def test_batch_update_cannot_name_files_outside_the_scope(drive, monkeypatch):
+    """A raw request that embeds another file (a linked Sheets chart, a Drive
+    video) is checked like a parameter."""
+    fake = MagicMock(spec=SlidesAPI)
+    monkeypatch.setattr(slides_server, "_api", lambda account=None: (fake, "me@work.com"))
+    for request in ({"createSheetsChart": {"spreadsheetId": "doc_dovalue", "chartId": 1, "linkingMode": "LINKED"}},
+                    {"createVideo": {"source": "DRIVE", "id": "doc_dovalue"}}):
+        for requests in ([request], json.dumps([request])):
+            res = await call(slides_server.mcp, "batch_update",
+                             {"presentation_id": "doc_specs", "requests": requests}, DDB)
+            assert res.is_error and "Outside scope: file doc_dovalue" in text(res)
+    fake.batch_update.assert_not_called()
+    fake.batch_update.return_value = {"replies": []}
+    ok_request = [{"createSheetsChart": {"spreadsheetId": "doc_specs", "chartId": 1}}]
+    assert env(await call(slides_server.mcp, "batch_update",
+                          {"presentation_id": "doc_specs", "requests": ok_request}, DDB))["ok"]

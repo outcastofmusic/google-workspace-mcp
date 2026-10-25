@@ -234,7 +234,9 @@ def test_outline_trashes_the_deck_when_the_move_fails(monkeypatch):
     api, svc, drive = _api(monkeypatch)
     svc.presentations().create().execute.return_value = _created()
     calls = _failing_move(drive)
-    with pytest.raises(RuntimeError, match="move failed"):
+    # Not the raw error: run_tool would read a connect failure as "never
+    # sent" and build a second deck.
+    with pytest.raises(slides_api.PartlyWritten, match="move failed.*it was trashed"):
         api.create_presentation_from_outline("T", OUTLINE, folder_id="DDB")
     assert calls[-1] == {"fileId": "P9", "body": {"trashed": True}, "supportsAllDrives": True}
     assert _batches(svc) == []
@@ -507,7 +509,7 @@ TOOLS = {
     "create_presentation_from_outline": (True, False, True),
     "add_slides": (True, False, True),
     "update_slide_text": (True, True, True),
-    "replace_all_text": (True, True, False),
+    "replace_text_in_deck": (True, True, False),
     "delete_slide": (True, True, False),
     "batch_update": (True, True, False),
 }
@@ -535,7 +537,7 @@ async def test_tools_registered_with_flags():
                     "revision_id": "r"}, "add_slides", ("P", [{"title": "a"}], 2, "r")),
     ("update_slide_text", {"presentation_id": "P", "slide_id": "s", "body": "- x"},
      "update_slide_text", ("P", "s", None, "- x", None, None)),
-    ("replace_all_text", {"presentation_id": "P", "find": "a", "replace": "b"},
+    ("replace_text_in_deck", {"presentation_id": "P", "find": "a", "replace": "b"},
      "replace_all_text", ("P", "a", "b", False, None)),
     ("delete_slide", {"presentation_id": "P", "slide_id": "s", "revision_id": "r"},
      "delete_slide", ("P", "s", "r")),
@@ -604,3 +606,72 @@ def test_readme_outline_example_builds_the_expected_requests(monkeypatch):
     bullets = [r["createParagraphBullets"]["textRange"] for r in reqs if "createParagraphBullets" in r]
     assert bullets[0] == {"type": "FIXED_RANGE", "startIndex": 13, "endIndex": 50}
     assert [m["notes"] for m in made] == ["", "Mention the OCR fix", ""]
+
+
+# --- review fixes ------------------------------------------------------------------
+
+def test_outline_moves_into_the_folder_before_building(monkeypatch):
+    """A deck whose build fails and whose trash fails is still in the folder."""
+    api, svc, drive = _api(monkeypatch)
+    created = _created()
+    created["layouts"] = []  # no TITLE_AND_BODY: the build fails with an unknown layout
+    svc.presentations().create().execute.return_value = created
+    order = []
+
+    def update(**kwargs):
+        order.append("move" if "addParents" in kwargs else "trash")
+        request = MagicMock()
+        if "trashed" in (kwargs.get("body") or {}):
+            request.execute.side_effect = RuntimeError("offline")
+        return request
+
+    drive.files().update.side_effect = update
+    with pytest.raises(ValueError, match="could not be trashed"):
+        api.create_presentation_from_outline("T", OUTLINE, folder_id="DDB")
+    assert order == ["move", "trash"]
+
+
+def test_add_slides_notes_failure_names_the_added_slides_and_is_not_retried(monkeypatch):
+    _ids(monkeypatch)
+    api, svc, _drive = _api(monkeypatch)
+    svc.presentations().get().execute.side_effect = [
+        _deck([], revision="r1"),
+        ConnectionRefusedError("connect failed"),  # the notes read after the slides batch
+    ]
+    sent = []
+    svc.presentations().batchUpdate.side_effect = lambda **kw: sent.append(kw) or MagicMock()
+    with pytest.raises(core.GoogleCoreError, match=r"added slides gwslide1.*do not add these slides again"):
+        server.run_tool(lambda: api.add_slides("P1", [{"title": "a", "notes": "n"}]))
+    assert len([s for s in sent if "createSlide" in json.dumps(s)]) == 1
+
+
+def test_fit_cuts_greek_text_to_what_fits():
+    slide = {"index": 0, "id": "s", "layout": "TITLE_AND_BODY", "title": "Τίτλος",
+             "body": "- " + "α" * 4000}
+    out = server._fit(slide, 2000)
+    assert out["cut"] and out["body"].endswith(" [cut]") and len(out["body"]) > 1500
+    assert server._size(out) <= 2000
+
+
+def test_fit_drops_many_small_shapes_quickly():
+    import time
+    slide = {"index": 0, "id": "s", "other": [{"shape": f"x{i}", "text": "t" * 20} for i in range(4000)]}
+    start = time.monotonic()
+    out = server._fit(slide, 5000)
+    assert server._size(out) <= 5000 and out["other"] and time.monotonic() - start < 0.5
+
+
+def test_read_presentation_caps_title_and_layouts_and_pages(monkeypatch):
+    fake = create_autospec(SlidesAPI, instance=True)
+    fake.read_presentation.side_effect = lambda pid: {  # a fresh read each call
+        "presentationId": "P1", "title": "T" * 5000, "revisionId": "r",
+        "layouts": [f"L{i}" * 50 for i in range(200)], "slideCount": 30,
+        "slides": [{"index": i, "id": f"s{i}", "body": "b" * 200} for i in range(30)],
+    }
+    monkeypatch.setattr(server, "_api", lambda account=None: (fake, "me@x.com"))
+    out = server.read_presentation(presentation_id="P1", max_chars=3000)
+    assert server._size(out) < 3300  # the budget plus the envelope
+    assert len(out["data"]["title"]) <= 310 and len(out["data"]["layouts"]) == 30
+    assert out["truncated"] and out["next_offset"] > 0
+    again = server.read_presentation(presentation_id="P1", max_chars=3000, offset=out["next_offset"])
+    assert again["data"]["slides"][0]["index"] == out["next_offset"]

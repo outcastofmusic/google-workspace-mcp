@@ -4,7 +4,8 @@
 With `drive_folders` set, a Drive, Docs, Sheets or Slides call SHALL fail with an error starting
 `Outside scope:` that names the file when any file or folder it names (`file_id`, `file_ids`,
 `folder_id`, `parent_id`, `new_parent_id`, `document_id`, `spreadsheet_id`, `presentation_id`, also as keys of the
-`items` of the batch tools) is neither one of the scope's folders for the call's account nor below
+`items` of the batch tools, and every `spreadsheetId`, `presentationId`, `documentId`, `fileId` and
+Drive video `id` inside the `requests` of `batch_update`) is neither one of the scope's folders for the call's account nor below
 one of them through its parent folders. A
 `drive_id` argument, `list_drives` and `list_changes` SHALL be refused, since they reach the whole
 Drive. A file that has no parent in the

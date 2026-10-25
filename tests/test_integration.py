@@ -333,7 +333,7 @@ async def test_workspace_server_carries_every_tool_unchanged():
     assert "list_changes" not in combined
     assert {"gmail_list_changes", "drive_list_changes"}.issubset(combined)
     assert {"read_presentation", "create_presentation_from_outline", "slides_batch_update",
-            "slides_replace_all_text", "docs_replace_all_text"}.issubset(combined)
+            "replace_text_in_deck", "replace_all_text"}.issubset(combined)
 
 
 @pytest.mark.anyio
@@ -447,7 +447,7 @@ async def test_required_ids_are_required_in_schema():
         (sl, "create_presentation_from_outline", {"title", "slides"}, "folder_id"),
         (sl, "add_slides", {"presentation_id", "slides"}, "position"),
         (sl, "update_slide_text", {"presentation_id", "slide_id"}, "revision_id"),
-        (sl, "replace_all_text", {"presentation_id", "find"}, "replace"),
+        (sl, "replace_text_in_deck", {"presentation_id", "find"}, "replace"),
         (sl, "delete_slide", {"presentation_id", "slide_id"}, "revision_id"),
         (sl, "batch_update", {"presentation_id", "requests"}, "revision_id"),
     ]
@@ -592,7 +592,7 @@ async def test_outward_and_overwrite_tools_are_destructive():
         (g, "send_draft", True), (g, "create_filter", True), (g, "block_sender", False),
         (dr, "share_file", True), (dr, "unshare_file", False), (dr, "update_file_content", False),
         (d, "batch_update", False), (s, "batch_update", False), (sl, "batch_update", False),
-        (sl, "update_slide_text", False), (sl, "replace_all_text", False),
+        (sl, "update_slide_text", False), (sl, "replace_text_in_deck", False),
     ]
     for mod, name, open_world in cases:
         ann = _tool_by_name(await mod.mcp.list_tools(), name).annotations
@@ -604,3 +604,18 @@ def test_drive_document_tools_stay_in_readonly_mode():
     names = _tool_names("drive", {**_base_env(), "GOOGLE_MCP_READONLY": "1"})
     assert {"read_file_text", "read_files", "list_folder_tree"} <= names
     assert "upload_file" not in names
+
+
+def test_combined_names_do_not_depend_on_the_toolset():
+    """A shared name keeps its prefix whatever GOOGLE_MCP_TOOLSET registers."""
+    import subprocess
+    import sys
+    code = ("from google_workspace_mcp.workspace import server as w;"
+            "print(sorted(t.name for t in w.mcp._tool_manager.list_tools()))")
+    names = {}
+    for toolset in ("all", "core"):
+        env = {**os.environ, "GOOGLE_MCP_TOOLSET": toolset}
+        out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
+        names[toolset] = set(eval(out.stdout))  # noqa: S307 - our own printed list
+    assert names["core"] <= names["all"]
+    assert "replace_all_text" in names["all"] and "replace_text_in_deck" in names["all"]

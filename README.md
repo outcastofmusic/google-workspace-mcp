@@ -106,14 +106,18 @@ runs the Google call through shared error mapping, and returns
   and per slide its `id`, `layout`, `title`, `body` (in the outline format above), the text of
   other shapes and tables under `other`, and `notes`. It returns whole slides up to `max_chars`
   (default 20,000); with `truncated: true`, call again with `offset` set to `next_offset`, the
-  index of the first slide left out.
+  index of the first slide left out. The deck's title is cut at 300 characters and its layouts at
+  30 names, since they come from the deck; one slide larger than the budget comes back cut, with
+  `cut: true`.
 - **Edits that do not overwrite the user's**: `update_slide_text` replaces a slide's title, body
-  or notes (each only when given; `""` clears it), `replace_all_text` replaces every match in the
+  or notes (each only when given; `""` clears it), `replace_text_in_deck` replaces every match in the
   deck and returns `occurrencesChanged`, and `delete_slide` deletes one slide. Every write takes
   `revision_id`: pass the `revisionId` of the read the write follows, and if someone edited the
   deck since, the call fails with "changed after revision" and writes nothing. Each write returns
   the new `revisionId`. `batch_update` sends raw Slides requests (images, tables, shapes,
   styling) for what the other tools do not cover.
+  Under a client scope with Drive folders, every file a raw request names (a linked Sheets
+  chart, a Drive video) must lie inside the scope too.
 - **Setup**: the token's `drive` scope covers the Slides API, so no account logs in again, but
   enable the **Google Slides API** in your OAuth client's Cloud project. Export a deck to PDF
   or pptx with the Drive server's `export_file`; `read_file_text` also reads a deck's text.
@@ -246,8 +250,7 @@ than blocking the protocol.
 `gworkspace-mcp` serves all six services from one process (~130MB instead of
 ~450MB for five separate servers). Tools keep their names; the few that two
 services share get the service as a prefix (`drive_list_changes`,
-`sheets_add_comment`, `docs_replace_all_text` and `slides_replace_all_text`,
-`slides_batch_update`). If you only want some services, register their servers
+`sheets_add_comment`, `slides_batch_update`), whichever toolset is on. If you only want some services, register their servers
 separately instead: `gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`,
 `gdrive-mcp`, `gslides-mcp`, each as its own entry with the same `uvx --from`
 args.

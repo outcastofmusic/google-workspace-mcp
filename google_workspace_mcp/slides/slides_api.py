@@ -269,6 +269,16 @@ def _url(presentation_id: str) -> str:
     return f"https://docs.google.com/presentation/d/{presentation_id}/edit"
 
 
+class PartlyWritten(core.GoogleCoreError):
+    """A call that changed Google before it failed. It is not a connect
+    failure, so ``run_tool`` never repeats the call."""
+
+
+def _reason(e: BaseException) -> str:
+    text = " ".join(str(e).split())
+    return text[:300] or type(e).__name__
+
+
 class SlidesAPI:
     def __init__(self, account=None):
         self.account = account
@@ -305,12 +315,14 @@ class SlidesAPI:
         return revision_id or current
 
     def _trash(self, presentation_id):
+        """Trash a deck; reports whether it went."""
         try:
             self._drive().files().update(
                 fileId=presentation_id, body={"trashed": True}, supportsAllDrives=True
             ).execute()
+            return True
         except Exception:  # noqa: BLE001 - report the original failure, not the cleanup
-            pass
+            return False
 
     def get_presentation(self, presentation_id, fields=None):
         kwargs = {"presentationId": presentation_id}
@@ -381,19 +393,25 @@ class SlidesAPI:
         check_items(slides)
         created = self._presentations().create(body={"title": title}).execute()
         pid = created["presentationId"]
+        # From here the deck exists, so no failure may surface as one that a
+        # retry of the whole call would repeat: it would build a second deck.
         try:
-            deck = created if created.get("layouts") else self.get_presentation(pid)
-            requests, made = outline_requests(deck, slides)
+            # Into the scope's folder first, so a deck left by a failed
+            # cleanup is never outside it.
             if folder_id:
                 place_in_folder(self._drive(), pid, folder_id)
+            deck = created if created.get("layouts") else self.get_presentation(pid)
+            requests, made = outline_requests(deck, slides)
             # The new deck's default title slide goes once the outline's slides exist.
             requests += [{"deleteObject": {"objectId": s["objectId"]}}
                          for s in deck.get("slides") or [] if s.get("objectId")]
             resp = self._batch(pid, requests)
             resp = self._write_notes(pid, made) or resp
-        except Exception:
-            self._trash(pid)
-            raise
+        except Exception as e:  # noqa: BLE001 - every failure after create is reported the same way
+            fate = "it was trashed" if self._trash(pid) else f"it could not be trashed; delete {_url(pid)}"
+            if isinstance(e, ValueError):
+                raise ValueError(f"{e} (a deck was created and {fate})") from e
+            raise PartlyWritten(f"building the deck failed after it was created ({_reason(e)}); {fate}") from e
         return {
             "presentationId": pid,
             "title": created.get("title", title),
@@ -429,7 +447,14 @@ class SlidesAPI:
             raise ValueError(f"position must be between 0 and {count}")
         requests, made = outline_requests(deck, slides, position)
         resp = self._batch(presentation_id, requests, rev)
-        resp = self._write_notes(presentation_id, made) or resp
+        try:
+            resp = self._write_notes(presentation_id, made) or resp
+        except Exception as e:  # noqa: BLE001 - the slides are in the deck; say so
+            ids = ", ".join(m["slide_id"] for m in made)
+            raise PartlyWritten(
+                f"added slides {ids} to {presentation_id}, but their speaker notes were not written "
+                f"({_reason(e)}); do not add these slides again; set the notes with update_slide_text"
+            ) from e
         return {
             "presentationId": presentation_id,
             "slideIds": [m["slide_id"] for m in made],

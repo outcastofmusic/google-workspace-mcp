@@ -21,7 +21,7 @@ way to produce it.
 | `create_presentation` | mutating | An empty deck, optionally inside `folder_id` |
 | `add_slides` | mutating, core | Slides from the same outline items, at the end or at a position |
 | `update_slide_text` | mutating, destructive, core | Replaces the title, body or notes of one slide |
-| `replace_all_text` | mutating, destructive | Replaces every match of a text in the deck |
+| `replace_text_in_deck` | mutating, destructive | Replaces every match of a text in the deck |
 | `delete_slide` | mutating, destructive | Deletes one slide |
 | `batch_update` | mutating, destructive | Raw Slides requests, for what the others do not cover |
 

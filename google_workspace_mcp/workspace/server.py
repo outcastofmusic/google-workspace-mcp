@@ -8,7 +8,8 @@ Gmail, Calendar, Sheets, Docs, Drive and Slides together.
 
 Tools are taken from the six server modules as they are, so behavior, the
 read-only gate and the toolset filter stay identical. Names that two servers
-share (list_changes, add_comment, batch_update, replace_all_text, ...) get the service as prefix,
+share (list_changes, add_comment, batch_update, ...) get the service as prefix, counted over
+every tool a server declares, so a name does not change with the toolset,
 e.g. ``drive_list_changes``; unique names are kept. The common account tools
 are registered once.
 """
@@ -18,6 +19,7 @@ from collections import Counter
 
 from ..calendar import server as calendar
 from ..core import build_server
+from ..core.runtime import declared_tools
 from ..docs import server as docs
 from ..drive import server as drive
 from ..gmail import server as gmail
@@ -34,8 +36,10 @@ mcp = build_server(
 )
 
 _common = {t.name for t in mcp._tool_manager.list_tools()}
+# Counted over every declared tool, so a name keeps its prefix whatever the
+# toolset or the read-only gate registered.
 _counts = Counter(
-    t.name for m in _SERVICES.values() for t in m.mcp._tool_manager.list_tools() if t.name not in _common
+    name for m in _SERVICES.values() for name in declared_tools.get(id(m.mcp), ()) if name not in _common
 )
 
 for _service, _module in _SERVICES.items():

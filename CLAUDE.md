@@ -43,7 +43,8 @@ google_workspace_mcp/
              outline bodies ("- " bullets, 2 spaces per level) -> one batchUpdate,
              speaker notes in a second one; read_presentation capped by slide
   workspace/ server.py: every server's tools in one process    -> gworkspace-mcp
-             (names two servers share get the service prefix)
+             (names two servers declare get the service prefix, counted
+              over runtime.declared_tools so the toolset does not change them)
 ```
 
 Gmail and Calendar reuse the API wrappers from their sibling CLI packages (`gmail_cli`, `google_calendar_cli`); Sheets/Docs/Drive/Slides have their own thin wrappers in this repo built on `core.get_service(name, version, account=...)`.
@@ -85,7 +86,7 @@ Mutating calls also pass `core/policy.py` (recipient allowlist, required/read-on
 A client may limit one call to some accounts and Drive folders through `_meta["io.github.outcastofmusic.workspace/scope"]` (`core/scope.py`; README "Client scope"). `WorkspaceServer.call_tool` parses it from `context.request_context.meta` and sets the `scope.current` ContextVar, which the tool's worker thread inherits. `GOOGLE_MCP_REQUIRE_SCOPE=1` refuses calls without one.
 
 - **Accounts:** `get_api` (through `_client`) refuses a resolved account outside `accounts` for every call. `fanout.target_accounts`, `list_accounts`, `auth_status` and `whoami` also honor it. Never resolve an account and call Google without `get_api`.
-- **Drive folders:** the Drive, Docs, Sheets and Slides servers rebind `register = functools.partial(_register, drive_scoped=True)`. The `drive_scoped` wrapper checks the eight parameters in `runtime.SCOPED_FILE_PARAMS`, `presentation_id` among them (and the same keys inside `items`), through the parent chain before the tool runs, refuses `drive_id` and `list_drives`, requires the parent parameter of create tools (`_CREATE_PARENT`), and filters the file lists of `_FILTERED_TOOLS`. A new Drive-family tool must name files only through those eight parameters; a new create tool must be added to `_CREATE_PARENT`, and a new listing tool to `_FILTERED_TOOLS`. Gmail and Calendar tools are never drive-scoped, so their `message_id`/`event_id` are not read as files.
+- **Drive folders:** the Drive, Docs, Sheets and Slides servers rebind `register = functools.partial(_register, drive_scoped=True)`. The `drive_scoped` wrapper checks the eight parameters in `runtime.SCOPED_FILE_PARAMS`, `presentation_id` among them (and the same keys inside `items`), through the parent chain before the tool runs, and every file id inside a raw `requests` list (`_request_files`), refuses `drive_id` and `list_drives`, requires the parent parameter of create tools (`_CREATE_PARENT`), and filters the file lists of `_FILTERED_TOOLS`. A new Drive-family tool must name files only through those eight parameters; a new create tool must be added to `_CREATE_PARENT`, and a new listing tool to `_FILTERED_TOOLS`. Gmail and Calendar tools are never drive-scoped, so their `message_id`/`event_id` are not read as files.
 - The folder check uses `runtime.borrow_api`, which holds the Drive client lock only for the check (or reuses it when the tool already holds it), so it cannot deadlock with the tool's own clients.
 - Refusals raise `core.InvalidArgumentError("Outside scope: ...")`. Audit entries carry `scope`.
 

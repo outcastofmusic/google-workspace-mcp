@@ -30,27 +30,52 @@ def _api(account=None):
     return get_api("slides", SlidesAPI, account)
 
 
+def _size(value) -> int:
+    """Characters of a value's JSON as the client sees it."""
+    return len(json.dumps(value, ensure_ascii=False))
+
+
+def _largest(fits, n: int) -> int:
+    """The largest k in 0..n with fits(k), for a fits that holds up to some k."""
+    lo, hi = 0, n
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if fits(mid):
+            lo = mid
+        else:
+            hi = mid - 1
+    return lo
+
+
 def _fit(slide: dict, limit: int) -> dict:
-    """Cut the text of one slide so its JSON fits ``limit`` characters."""
-    if len(json.dumps(slide)) <= limit:
+    """Cut one slide so its JSON fits ``limit`` characters: other shapes go
+    first, then notes, body and title are cut, each to the most that fits."""
+    if _size(slide) <= limit:
         return slide
     out = json.loads(json.dumps(slide))
     out["cut"] = True
-    while (size := len(json.dumps(out))) > limit:
-        texts = [(len(out[k]), k, None) for k in ("title", "body", "notes") if out.get(k)]
-        texts += [(len(o["text"]), "other", i) for i, o in enumerate(out.get("other") or [])]
-        if not texts:
+    others = out.pop("other", None) or []
+    keep = _largest(lambda k: _size({**out, "other": others[:k]} if k else out) <= limit, len(others))
+    if keep:
+        out["other"] = others[:keep]
+    for key in ("notes", "body", "title"):
+        text = out.get(key)
+        if _size(out) <= limit:
             break
-        n, key, i = max(texts)
-        keep = n - (size - limit) - len(_CUT) - 8  # always < n, so each pass shrinks
-        holder, field = (out["other"][i], "text") if key == "other" else (out, key)
-        if keep > 0:
-            holder[field] = holder[field].removesuffix(_CUT)[:keep] + _CUT
-        elif key == "other":
-            out["other"].pop(i)
+        if not text:
+            continue
+        n = _largest(lambda k: _size({**out, key: text[:k] + _CUT}) <= limit, len(text))
+        if n:
+            out[key] = text[:n] + _CUT
         else:
             del out[key]
     return out
+
+
+# A deck's title and layout names come from the deck, which may be hostile.
+_TITLE_CHARS = 300
+_LAYOUTS = 30
+_LAYOUT_CHARS = 40
 
 
 # --- read ---
@@ -71,6 +96,12 @@ def read_presentation(
     api, resolved = _api(account)
     data = run_tool(lambda: api.read_presentation(presentation_id))
     limit = max_chars if max_chars is not None else DEFAULT_READ_CHARS
+    title = data.get("title") or ""
+    if len(title) > _TITLE_CHARS:
+        data["title"] = title[:_TITLE_CHARS] + _CUT
+    data["layouts"] = [str(name)[:_LAYOUT_CHARS] for name in (data.get("layouts") or [])[:_LAYOUTS]]
+    # The slides get what the rest of the result leaves.
+    limit = max(1, limit - _size({k: v for k, v in data.items() if k != "slides"}))
     slides, meta = cap_items(
         data["slides"], limit, offset,
         hint="Call read_presentation again with offset=next_offset.",
@@ -147,7 +178,7 @@ def update_slide_text(
 
 
 @register(mcp, mutating=True, destructive=True)
-def replace_all_text(
+def replace_text_in_deck(
     account: str | None = None,
     *,
     presentation_id: str,

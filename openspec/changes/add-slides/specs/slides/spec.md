@@ -15,7 +15,8 @@ Under `GOOGLE_MCP_READONLY` only `read_presentation` SHALL be registered.
 `read_presentation` SHALL return the deck's title, the names of its layouts, and for each slide
 its object id, layout name, title text, body text and speaker notes text, in slide order. Text of
 other shapes SHALL follow the body, marked by shape. The result SHALL stop at `max_chars`
-(default 20,000) with `truncated: true` and the index of the first slide left out.
+(default 20,000) with `truncated: true` and the index of the first slide left out. The title SHALL be
+cut at 300 characters and the layouts at 30 names of 40 characters, inside the budget.
 
 #### Scenario: Long deck
 - **WHEN** a deck of 80 slides holds 50,000 characters and the model calls `read_presentation` with no `max_chars`
@@ -36,10 +37,11 @@ the end or at `position`. An unknown layout SHALL fail the call, naming the deck
 
 ### Requirement: Changing a deck
 `update_slide_text` SHALL replace the title, body or notes of one slide, each only when given.
-`replace_all_text` SHALL replace every match in the deck and return how many it changed.
+`replace_text_in_deck` SHALL replace every match in the deck and return how many it changed.
 `delete_slide` SHALL delete one slide. `batch_update` SHALL send raw Slides requests. Each write
 that follows a read SHALL accept the read's `revision_id` and fail, changing nothing, when the
-deck changed since. `update_slide_text`, `replace_all_text`, `delete_slide` and `batch_update`
+deck changed since. A call that fails after it changed the deck SHALL say what it changed and
+SHALL NOT be repeated by the server. `update_slide_text`, `replace_text_in_deck`, `delete_slide` and `batch_update`
 SHALL be marked destructive.
 
 #### Scenario: Stale write

@@ -40,13 +40,26 @@ client scope keeps them inside the project's folders.
   the model can pass one of them.
 - [Placeholder text of the layout shows on an empty body] → a slide with no body uses `TITLE`.
 - [Slides API quota] → one batch per call, two when slides carry notes; at most 100 slides per call.
-- [Combined server names] → `replace_all_text` and `batch_update` exist in Docs and Slides, so
-  `gworkspace-mcp` prefixes both: Docs' `replace_all_text` becomes `docs_replace_all_text` there.
-  A client that calls the unprefixed name on the combined server must rename it (found 2026-10-25
-  during apply; the single servers keep their names).
+- [Combined server names] → the Slides tool is `replace_text_in_deck`, so Docs' `replace_all_text`
+  keeps its name in `gworkspace-mcp`. The combined server counts shared names over every tool a
+  server declares (`runtime.declared_tools`), so a prefix no longer changes with the toolset.
 - [Slides API not enabled] → the `drive` scope covers Slides, but the OAuth client's Cloud project
   must enable the Google Slides API; until then calls fail with Google's 403 naming the API. The
   README says so.
+
+## Review fixes, 2026-10-25
+
+An independent review reproduced these, now fixed and tested:
+
+| Finding | Fix |
+|---|---|
+| `batch_update` could name a file outside the scope inside a request (`createSheetsChart.spreadsheetId`, a Drive `createVideo`) | The scope check reads every file id in `requests` (`runtime._request_files`) as it reads parameters |
+| A connect failure after the slides batch made `run_tool` repeat all of `add_slides`, adding the slides twice; a failed notes step said nothing was written | A failure after a write raises `PartlyWritten`, a `GoogleCoreError` that `run_tool` never repeats, naming the slides added |
+| `create_presentation_from_outline` moved the deck into the folder after building; a failed build with a failed trash left a deck in My Drive | The move comes first; the error says whether the deck was trashed |
+| `_fit` measured escaped JSON, so a Greek slide lost its whole body; 4,000 small shapes took 3 s | Characters measured as sent, cuts found by binary search, other shapes dropped in one step |
+| `cap_items` counted a Greek letter as six characters | It measures with `ensure_ascii=False`, for every server |
+| The deck's title and layout names were outside the budget | Title cut at 300 characters, 30 layouts of 40 characters, and the rest of the budget goes to slides |
+| The combined server named Docs' tool by toolset | Renamed the Slides tool and count names over declared tools |
 
 ## Migration Plan
 

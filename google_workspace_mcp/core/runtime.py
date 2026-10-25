@@ -136,7 +136,9 @@ def cap_items(
     _check_offset(offset)
     kept, used = [], 0
     for item in items[offset:]:
-        size = len(json.dumps(item, default=str))
+        # Characters as the client sees them: ensure_ascii would count a
+        # Greek letter as six.
+        size = len(json.dumps(item, default=str, ensure_ascii=False))
         if kept and used + size > limit:
             break
         kept.append(item)
@@ -395,12 +397,44 @@ def _named_files(kwargs: dict) -> list[tuple[str, str]]:
 
     for name in SCOPED_FILE_PARAMS:
         add(name, kwargs.get(name))
+    # A raw batch request may name another Drive file in its body: a linked
+    # Sheets chart, a Drive video. Those ids are checked like parameters.
+    requests = kwargs.get("requests")
+    if isinstance(requests, str):
+        try:
+            requests = json.loads(requests)
+        except ValueError:
+            requests = None
+    if isinstance(requests, list):
+        for i, request in enumerate(requests):
+            for key, value in _request_files(request):
+                add(f"requests[{i}].{key}", value)
     items = kwargs.get("items")
     if isinstance(items, list):
         for i, item in enumerate(items):
             if isinstance(item, dict):
                 for name in SCOPED_FILE_PARAMS:
                     add(f"items[{i}].{name}", item.get(name))
+    return out
+
+
+_REQUEST_FILE_KEYS = ("spreadsheetId", "presentationId", "documentId", "fileId")
+
+
+def _request_files(node: Any, path: str = "") -> list[tuple[str, Any]]:
+    """``(where, id)`` of every Drive file a raw API request names."""
+    out: list[tuple[str, Any]] = []
+    if isinstance(node, dict):
+        if str(node.get("source", "")).upper() == "DRIVE" and node.get("id"):
+            out.append((f"{path}id".lstrip("."), node["id"]))
+        for key, value in node.items():
+            if key in _REQUEST_FILE_KEYS and isinstance(value, str):
+                out.append((f"{path}{key}".lstrip("."), value))
+            elif isinstance(value, (dict, list)):
+                out += _request_files(value, f"{path}{key}.")
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            out += _request_files(value, f"{path}{i}.")
     return out
 
 
@@ -542,6 +576,11 @@ def _off_loop(fn: Callable) -> Callable:
     return wrapper
 
 
+# Names of the tools each server declares, by id of the server, whether or
+# not the read-only gate or the toolset registered them.
+declared_tools: dict[int, set[str]] = {}
+
+
 def register(
     mcp,
     *,
@@ -565,6 +604,9 @@ def register(
     """
 
     def deco(fn: Callable) -> Callable:
+        # Every tool a server declares, registered or not, so names the
+        # combined server prefixes do not change with the toolset or the gate.
+        declared_tools.setdefault(id(mcp), set()).add(fn.__name__)
         if mutating and READONLY:
             return fn  # skip registration entirely
         if TOOLSET == "core" and not core:
