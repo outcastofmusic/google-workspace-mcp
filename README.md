@@ -1,7 +1,7 @@
 # google-workspace-mcp
 
-Five aligned MCP servers for Google Workspace: **Gmail**, **Calendar**,
-**Sheets**, **Docs**, and **Drive**. They share one credential store and one runtime core, so they behave
+Six aligned MCP servers for Google Workspace: **Gmail**, **Calendar**,
+**Sheets**, **Docs**, **Drive**, and **Slides**. They share one credential store and one runtime core, so they behave
 identically and support:
 
 - **Persistent auth**: log in once; tokens are reused and access tokens refresh
@@ -10,7 +10,7 @@ identically and support:
   (email or alias). Calls for different accounts use separate, cached clients and
   never interfere.
 - **Many operations**: ~44 Gmail tools, ~27 Calendar tools, ~65 Sheets tools (incl. text editing),
-  ~40 Docs tools, ~29 Drive tools, plus shared `list_accounts` / `whoami` /
+  ~40 Docs tools, ~29 Drive tools, 8 Slides tools, plus shared `list_accounts` / `whoami` /
   `auth_status` on every server.
 
 ## Architecture
@@ -28,6 +28,7 @@ google_workspace_mcp/
   docs/      DocsAPI (Docs API v1)                   -> gdocs-mcp
   drive/     DriveAPI (Drive API v3)                 -> gdrive-mcp
              + extract.py: PDF (pypdf), docx, pptx, xlsx text
+  slides/    SlidesAPI (Slides API v1)               -> gslides-mcp
   contacts/  PeopleAPI (People API v1)               -> search_contacts on gmail-mcp + gcal-mcp
 ```
 
@@ -72,6 +73,55 @@ runs the Google call through shared error mapping, and returns
 - **Folder trees**: `list_folder_tree(folder_id=...)` lists every file under a folder and its subfolders, with `path`, `modifiedTime`, `md5Checksum` and `webViewLink`, up to `max_files` (default 500) and `max_depth` (default 10).
 - **Untrusted files**: Office XML that declares a DOCTYPE is refused, an Office file may expand to at most 200 MiB, and password-protected PDFs fail with an error that says so.
 
+### Slides (`gslides-mcp`)
+
+- **A deck from an outline in one call**: `create_presentation_from_outline` takes a
+  `title`, an optional `folder_id` and a list of `slides`, each `{title, body?, notes?, layout?}`.
+  A body is plain lines: a line that starts with `- ` is a bullet, and two spaces of indent
+  before the dash nest it one level; any other line is a paragraph. `notes` become the speaker
+  notes. Slides use the deck's own layouts, so the theme applies: `layout` names one of them
+  (`TITLE`, `TITLE_AND_BODY`, `SECTION_HEADER`, `TITLE_ONLY`, `BLANK` in the default theme, or
+  its display name); the default is `TITLE_AND_BODY`, or `TITLE` for a slide with no body. An
+  unknown layout fails the call and lists the deck's layouts. With `folder_id` the deck is moved
+  into that folder, and trashed if the move or the build fails. `add_slides` adds the same items
+  to an existing deck, at the end or at `position`. A call takes at most 100 slides.
+
+```json
+{
+  "name": "create_presentation_from_outline",
+  "arguments": {
+    "title": "DDB status",
+    "folder_id": "0BwDdbFolderId",
+    "slides": [
+      {"title": "DDB status", "body": "October 2026", "layout": "TITLE"},
+      {"title": "Done", "body": "OCR pipeline\n- done\n  - OCR timeout fixed\n  - retry on 429",
+       "notes": "Mention the OCR fix"},
+      {"title": "Next", "body": "- ship the expense API\n- review with DDB"}
+    ]
+  }
+}
+```
+
+- **Bounded reads**: `read_presentation` returns the deck's title, `revisionId`, its layouts,
+  and per slide its `id`, `layout`, `title`, `body` (in the outline format above), the text of
+  other shapes and tables under `other`, and `notes`. It returns whole slides up to `max_chars`
+  (default 20,000); with `truncated: true`, call again with `offset` set to `next_offset`, the
+  index of the first slide left out. The deck's title is cut at 300 characters and its layouts at
+  30 names, since they come from the deck; one slide larger than the budget comes back cut, with
+  `cut: true`.
+- **Edits that do not overwrite the user's**: `update_slide_text` replaces a slide's title, body
+  or notes (each only when given; `""` clears it), `replace_text_in_deck` replaces every match in the
+  deck and returns `occurrencesChanged`, and `delete_slide` deletes one slide. Every write takes
+  `revision_id`: pass the `revisionId` of the read the write follows, and if someone edited the
+  deck since, the call fails with "changed after revision" and writes nothing. Each write returns
+  the new `revisionId`. `batch_update` sends raw Slides requests (images, tables, shapes,
+  styling) for what the other tools do not cover.
+  Under a client scope with Drive folders, every file a raw request names (a linked Sheets
+  chart, a Drive video) must lie inside the scope too.
+- **Setup**: the token's `drive` scope covers the Slides API, so no account logs in again, but
+  enable the **Google Slides API** in your OAuth client's Cloud project. Export a deck to PDF
+  or pptx with the Drive server's `export_file`; `read_file_text` also reads a deck's text.
+
 ### Contact lookup (`gmail-mcp`, `gcal-mcp`)
 
 - **Name to email** — `search_contacts(query="Dana")` lets an agent told "email Dana"
@@ -94,9 +144,10 @@ pip install google-workspace-suite-mcp
 
 This pulls in the shared `google-auth-core` token store and the
 `gmail-cli-oauth` / `google-calendar-cli` clients automatically, and installs
-six console scripts onto your PATH: the five servers (`gmail-mcp`, `gcal-mcp`,
-`gsheets-mcp`, `gdocs-mcp`, `gdrive-mcp`) plus the `google-auth` CLI used to log
-in (see below).
+console scripts onto your PATH: the six servers (`gmail-mcp`, `gcal-mcp`,
+`gsheets-mcp`, `gdocs-mcp`, `gdrive-mcp`, `gslides-mcp`), the combined
+`gworkspace-mcp`, `gcal-busy-sync`, and the `google-auth` CLI used to log in
+(see below).
 
 If you prefer an isolated install with [pipx](https://pipx.pypa.io):
 
@@ -124,7 +175,8 @@ google-auth doctor                  # verify setup anytime
 ```
 
 The wizard walks you through creating a Desktop OAuth client in Google Cloud
-Console, logging in, confirming the five APIs are enabled, and prints
+Console, logging in, confirming the five APIs are enabled (enable the Google
+Slides API yourself if you use `gslides-mcp`), and prints
 ready-to-paste `.mcp.json` snippets that point at locally installed scripts.
 To run the servers through `uvx` instead, use the pinned form below.
 
@@ -156,7 +208,7 @@ for each account to get a token that doesn't expire weekly.
 
 - Create or select a project.
 - Enable the APIs you need: Gmail, Google Calendar, Google Sheets, Google Docs,
-  Google Drive, and People (for contact lookup).
+  Google Drive, Google Slides, and People (for contact lookup).
 - *APIs & Services → OAuth consent screen*: pick **Internal** (Workspace
   account) or **External** (personal Gmail). For External, click
   **Publish app** so the status is **In production** (see above for why).
@@ -195,12 +247,13 @@ than blocking the protocol.
 }
 ```
 
-`gworkspace-mcp` serves all five services from one process (~130MB instead of
-~450MB for five). Tools keep their names; the few that two services share get
-the service as a prefix (`drive_list_changes`, `sheets_add_comment`). If you
-only want some services, register their servers separately instead:
-`gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`, `gdrive-mcp`, each as its
-own entry with the same `uvx --from` args.
+`gworkspace-mcp` serves all six services from one process (~130MB instead of
+~450MB for five separate servers). Tools keep their names; the few that two
+services share get the service as a prefix (`drive_list_changes`,
+`sheets_add_comment`, `slides_batch_update`), whichever toolset is on. If you only want some services, register their servers
+separately instead: `gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`,
+`gdrive-mcp`, `gslides-mcp`, each as its own entry with the same `uvx --from`
+args.
 
 The `==0.7.0` pin means launches come from uv's cache after the first one:
 fast startup, works offline until the uv cache is cleaned, and a new release
@@ -323,7 +376,7 @@ A client that serves several projects from one server process can limit each too
 Both parts are optional, and each limits only when present:
 
 - `accounts` (emails or aliases): every tool refuses an account outside the list, reads as well as writes. Tools that span accounts (`*_all_accounts`, `sync_busy_blocks`) use only the listed accounts, and `list_accounts` lists only them.
-- `drive_folders` (`{account, id}` pairs): Drive, Docs and Sheets tools refuse any `file_id`, `file_ids`, `folder_id`, `parent_id`, `new_parent_id`, `document_id` or `spreadsheet_id` that is not one of the account's scope folders or below one through its parent folders (also inside the `items` of the batch tools). A file only shared with the user has no parent in the account's view, so it is outside. `list_drives`, `list_changes` (which lists changes across the whole Drive, file names included) and a `drive_id` argument are refused. `search_files`, `list_files` and `search_files_all_accounts` return only files inside the scope, so a page may hold fewer than `page_size` files while `next_page_token` still continues. Tools that create a file must name a parent inside the scope: `parent_id` for `upload_file`, `create_folder`, `copy_file` and `batch_create_folders` items, `folder_id` for `create_document`, `create_document_from_markdown` and `create_spreadsheet`. Gmail and Calendar tools are limited by `accounts` only.
+- `drive_folders` (`{account, id}` pairs): Drive, Docs, Sheets and Slides tools refuse any `file_id`, `file_ids`, `folder_id`, `parent_id`, `new_parent_id`, `document_id`, `spreadsheet_id` or `presentation_id` that is not one of the account's scope folders or below one through its parent folders (also inside the `items` of the batch tools). A file only shared with the user has no parent in the account's view, so it is outside. `list_drives`, `list_changes` (which lists changes across the whole Drive, file names included) and a `drive_id` argument are refused. `search_files`, `list_files` and `search_files_all_accounts` return only files inside the scope, so a page may hold fewer than `page_size` files while `next_page_token` still continues. Tools that create a file must name a parent inside the scope: `parent_id` for `upload_file`, `create_folder`, `copy_file` and `batch_create_folders` items, `folder_id` for `create_document`, `create_document_from_markdown`, `create_spreadsheet`, `create_presentation` and `create_presentation_from_outline`. Gmail and Calendar tools are limited by `accounts` only.
 
 A refused call returns an error starting `Outside scope:` that names the account, file or missing parameter. A scope of the wrong shape fails the call with an error naming the problem. A call without a scope behaves as before; set `GOOGLE_MCP_REQUIRE_SCOPE=1` to refuse such calls when every client is known to send one. With `GOOGLE_MCP_AUDIT_LOG` set, each entry records the call's `scope` (`null` without one).
 
@@ -333,12 +386,13 @@ Over stdio the scope is as trustworthy as the process that started the server. O
 
 ## Smaller tool set
 
-The full servers expose about 190 tools, and every tool schema costs agent
+The full servers expose about 200 tools, and every tool schema costs agent
 context. Set `GOOGLE_MCP_TOOLSET=core` in a server's environment to register
-only the everyday tools (10-16 per server: read/search/get, basic
+only the everyday tools (4-16 per server: read/search/get, basic
 create and update, Gmail send/reply/drafts, Calendar event CRUD, Sheets range
 reads/writes and `write_table`, Docs markdown create/read/append, Drive
-search/read/upload/move). `list_accounts`, `whoami` and `auth_status` are always
+search/read/upload/move, Slides `read_presentation`,
+`create_presentation_from_outline`, `add_slides` and `update_slide_text`). `list_accounts`, `whoami` and `auth_status` are always
 included. The default is `all`. It combines with `GOOGLE_MCP_READONLY`: with
 both set you get the read-only part of the core set.
 
@@ -356,6 +410,6 @@ GOOGLE_MCP_LIVE=1 pytest   # opt-in live smoke tests (needs a real test account)
 - Auth is out-of-band: servers are non-interactive token consumers. If a token
   is missing or scope-short, a tool returns an actionable error
   (`Run: google-auth login <account>`) instead of blocking the protocol.
-- The five servers are packaged as one distribution with five console-script
-  entry points (a single `pip install`), rather than five separate packages.
+- The six servers are packaged as one distribution with one console-script
+  entry point each (a single `pip install`), rather than six separate packages.
   Alignment comes from the shared `core`, not from separate packaging.

@@ -10,6 +10,9 @@ Env:
   GOOGLE_MCP_TEST_SHEET_ID=<id>    an existing scratch spreadsheet for the
                                    Sheets round-trip (avoids leaving litter)
   GOOGLE_MCP_TEST_ACCOUNT_2=<email> second account, for the isolation check
+
+The Slides round trip needs the Google Slides API enabled in the OAuth
+client's Cloud project.
 """
 
 import os
@@ -220,3 +223,42 @@ def test_drive_change_feed_live(tmp_path):
     finally:
         if file_id:
             drive_api.delete_file(file_id)
+
+
+def test_slides_roundtrip_live():
+    """Build a deck from an outline, read it, edit it, and delete it."""
+    from google_workspace_mcp.drive import server as drive
+    from google_workspace_mcp.slides import server as slides
+
+    slides_api, _ = slides._api(ACCOUNT)
+    drive_api, _ = drive._api(ACCOUNT)
+
+    created = slides_api.create_presentation_from_outline("mcp-live-slides-test", [
+        {"title": "MCP live", "layout": "TITLE"},
+        {"title": "Done", "body": "Summary\n- done\n  - nested", "notes": "live notes"},
+    ])
+    deck_id = created["presentationId"]
+    try:
+        read = slides_api.read_presentation(deck_id)
+        assert read["slideCount"] == 2
+        first, second = read["slides"]
+        assert first["title"] == "MCP live"
+        assert second["body"] == "Summary\n- done\n  - nested"
+        assert second["notes"] == "live notes"
+
+        added = slides_api.add_slides(deck_id, [{"title": "Extra"}], position=1,
+                                      revision_id=read["revisionId"])
+        updated = slides_api.update_slide_text(deck_id, second["id"], body="- changed",
+                                               revision_id=added["revisionId"])
+        assert updated["updated"] == ["body"]
+        with pytest.raises(Exception, match="changed after revision"):
+            slides_api.update_slide_text(deck_id, second["id"], title="stale",
+                                         revision_id=read["revisionId"])
+        replaced = slides_api.replace_all_text(deck_id, "changed", "replaced")
+        assert replaced["occurrencesChanged"] == 1
+        slides_api.delete_slide(deck_id, added["slideIds"][0])
+        final = slides_api.read_presentation(deck_id)
+        assert [s.get("title") for s in final["slides"]] == ["MCP live", "Done"]
+        assert final["slides"][1]["body"] == "- replaced"
+    finally:
+        drive_api.delete_file(deck_id)
