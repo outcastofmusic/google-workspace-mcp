@@ -570,3 +570,9 @@ async def test_outward_and_overwrite_tools_are_destructive():
         ann = _tool_by_name(await mod.mcp.list_tools(), name).annotations
         assert ann.destructive_hint is True, name
         assert ann.open_world_hint is open_world, name
+
+
+def test_drive_document_tools_stay_in_readonly_mode():
+    names = _tool_names("drive", {**_base_env(), "GOOGLE_MCP_READONLY": "1"})
+    assert {"read_file_text", "read_files", "list_folder_tree"} <= names
+    assert "upload_file" not in names

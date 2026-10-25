@@ -1,6 +1,8 @@
 """Google Drive MCP server: search, read, upload, organize, and share files."""
 from __future__ import annotations
 
+import google_auth_core as core
+
 from ..core import build_server, cap_text, get_api, ok, register, run_tool
 from ..core.fanout import fan_out, merged, tag
 from ..core.paths import safe_path
@@ -176,25 +178,95 @@ def read_file_text(
     account: str | None = None,
     *,
     file_id: str,
+    pages: str | None = None,
     max_chars: int | None = None,
     offset: int = 0,
 ) -> dict:
-    """Read small text inline (UTF-8 binary files, or Docs/Sheets exported as text).
+    """Read a file's text inline: text files, PDF, Word, PowerPoint, Excel, and native Docs, Sheets and Slides.
 
-    Returns up to max_chars characters (default 100000) starting at offset. When
-    more remains the envelope has truncated=true and next_offset; call again with
-    offset=next_offset for the next chunk. Files over 1 MiB raise an error — use
-    download_file or export_file instead. Slides and other non-text native types
-    are not supported.
+    PDF pages, slides and sheets are marked ([page 3], [slide 3], [sheet Name]).
+    pages limits PDFs and presentations to a range such as "3-7" or "1,4,9-10";
+    the result reports `total` pages and the `selected` ones. Returns up to
+    max_chars characters (default 100000) from offset; when more remains the
+    envelope has truncated=true and next_offset. Documents up to 25 MiB and
+    plain-text files up to 1 MiB; larger files need download_file.
     """
     api, resolved = _api(account)
-    data = run_tool(lambda: api.read_file_text(file_id))
+    data = run_tool(lambda: api.read_file_text(file_id, pages=pages))
     data["text"], meta = cap_text(
         data["text"], max_chars, offset,
-        hint="Call read_file_text again with offset=next_offset, or save the whole "
-        "file with download_file/export_file.",
+        hint="Call read_file_text again with offset=next_offset, narrow pages, or save the "
+        "whole file with download_file/export_file.",
     )
     return ok(resolved, data, **meta)
+
+
+@register(mcp)
+def read_files(
+    account: str | None = None,
+    *,
+    file_ids: list[str],
+    max_chars_per_file: int = 100_000,
+    max_chars_total: int = 400_000,
+) -> dict:
+    """Read the text of several files in one call (same formats as read_file_text).
+
+    Each file is cut at max_chars_per_file; files after the total budget is
+    spent are listed under `skipped` so they can be read later. A file that
+    fails is listed under `errors` and does not stop the rest.
+    """
+    if not file_ids:
+        raise core.InvalidArgumentError("file_ids must name at least one file")
+    if max_chars_per_file < 1 or max_chars_total < 1:
+        raise core.InvalidArgumentError("max_chars_per_file and max_chars_total must be positive")
+    api, resolved = _api(account)
+    files, errors, skipped = [], {}, []
+    used = 0
+    for file_id in dict.fromkeys(file_ids):
+        if used >= max_chars_total:
+            skipped.append(file_id)
+            continue
+        try:
+            data = run_tool(lambda fid=file_id: api.read_file_text(fid))
+        except core.GoogleCoreError as e:
+            errors[file_id] = str(e)
+            continue
+        limit = min(max_chars_per_file, max_chars_total - used)
+        text = data["text"]
+        if len(text) > limit:
+            data["truncated"] = True
+            data["total_chars"] = len(text)
+            text = text[:limit]
+        data["text"] = text
+        used += len(text)
+        files.append(data)
+    out = {"files": files}
+    if errors:
+        out["errors"] = errors
+    if skipped:
+        out["skipped"] = skipped
+    return ok(resolved, out)
+
+
+@register(mcp)
+def list_folder_tree(
+    account: str | None = None,
+    *,
+    folder_id: str,
+    max_files: int = 500,
+    max_depth: int = 10,
+) -> dict:
+    """List every file under a folder, including subfolders, with each file's folder path.
+
+    Returns files (id, name, mimeType, size, modifiedTime, md5Checksum,
+    webViewLink, path) and truncated=true when max_files was reached.
+    """
+    if max_files < 1 or max_depth < 0:
+        raise core.InvalidArgumentError("max_files must be positive and max_depth 0 or more")
+    api, resolved = _api(account)
+    return ok(resolved, run_tool(lambda: api.list_folder_tree(
+        folder_id, max_files=max_files, max_depth=max_depth,
+    )))
 
 
 @register(mcp)

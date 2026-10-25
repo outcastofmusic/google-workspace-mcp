@@ -291,10 +291,12 @@ def test_download_to_file_replaces_existing_on_success(monkeypatch, tmp_path):
     assert path.read_bytes() == b"aaaabbbbcccc"
 
 
-def test_read_file_text_rejects_slides(monkeypatch):
+def test_read_file_text_rejects_other_native_types(monkeypatch):
+    # Slides are read as text now (tests/test_drive_documents.py); Forms, Drawings
+    # and other native types still have no text export.
     api, svc = _api_with_mock(monkeypatch)
     svc.files().get().execute.return_value = {
-        "id": "S1", "name": "Deck", "mimeType": "application/vnd.google-apps.presentation",
+        "id": "S1", "name": "Form", "mimeType": "application/vnd.google-apps.form",
     }
     with pytest.raises(ValueError, match="export_file"):
         api.read_file_text("S1")
@@ -850,7 +852,7 @@ async def test_tools_registered_and_account_param():
     tools = {t.name: t for t in await server.mcp.list_tools()}
     drive_tools = [
         "search_files", "list_files", "list_drives", "get_file", "download_file", "export_file",
-        "read_file_text", "list_permissions", "list_comments",
+        "read_file_text", "read_files", "list_folder_tree", "list_permissions", "list_comments",
         "get_changes_start_token", "list_changes",
         "upload_file", "update_file_content",
         "create_folder", "move_file", "rename_file", "copy_file", "share_file", "unshare_file",
@@ -984,7 +986,9 @@ async def test_upload_file_refuses_token_store(monkeypatch, store_env):
     fake.upload_file.assert_not_called()
 async def test_read_file_text_pages_with_offset(monkeypatch):
     fake = MagicMock(spec=DriveAPI)
-    fake.read_file_text.side_effect = lambda file_id: {"fileId": file_id, "text": "abcdefghij"}
+    fake.read_file_text.side_effect = lambda file_id, pages=None: {
+        "fileId": file_id, "text": "abcdefghij",
+    }
     monkeypatch.setattr(server, "_api", lambda account=None: (fake, "d@x.com"))
 
     env = envelope(await server.mcp.call_tool("read_file_text", {"file_id": "T1", "max_chars": 4}))

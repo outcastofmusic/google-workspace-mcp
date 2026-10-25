@@ -1,0 +1,34 @@
+schema: spec-driven
+
+context: |
+  google-workspace-mcp is the user's fork of google-workspace-suite-mcp: one Python distribution
+  that ships five aligned MCP servers (Gmail, Calendar, Sheets, Docs, Drive), the combined
+  gworkspace-mcp, the gcal-busy-sync CLI and the google-auth login CLI. All servers share
+  core/ (account resolution and warm-client cache, run_tool error mapping, the register
+  decorator with the read-only gate, the safety policy in core/policy.py, fan-out helpers) and
+  one ~/.google token store. CLAUDE.md holds the tool contract every tool follows.
+
+  Stack: Python 3.10-3.13, mcp 2.x (MCPServer), google-api-python-client, google-auth-core.
+  Servers run over stdio on the user's own machine and are non-interactive token consumers:
+  they never run an OAuth flow.
+
+  Main client: the user's mini-web-ui (Go chat app, ../mini-webui) talking to local models
+  (Qwen 3.8 Next Flash, 200k context) through an OpenAI-compatible gateway. Small tool
+  schemas and bounded tool output matter, because every tool schema and result costs context.
+
+  Users: one person with several Google accounts (personal and work). Content the agent reads
+  (mail, documents) is untrusted and may carry injected instructions.
+
+  Quality gates: ruff check . && pytest (CI on push and PR to main, Python 3.10-3.13).
+  GOOGLE_MCP_LIVE=1 pytest runs opt-in live tests against real Google APIs, never in CI.
+
+rules:
+  proposal:
+    - State every new dependency, its licence, and whether it is pure Python.
+    - State which tools are added or changed and whether each is read-only or mutating.
+  design:
+    - Record each decision with its date and the alternative rejected.
+    - Say how the change holds up against untrusted file or mail content.
+  tasks:
+    - Follow the tool contract in CLAUDE.md; mutating tools set mutating=True.
+    - End every change with tasks to update the README and CLAUDE.md and to run ruff and pytest.
