@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "google-workspace-suite-mcp"
-version = "0.7.0"
+version = "0.8.0"
 description = "Aligned MCP servers for Gmail, Calendar, Sheets, Docs, Drive, and Slides with persistent, multi-account auth"
 readme = "README.md"
 requires-python = ">=3.10"
