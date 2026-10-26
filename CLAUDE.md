@@ -19,7 +19,7 @@ GOOGLE_MCP_LIVE=1 pytest   # opt-in live smoke tests; hit real Google APIs, neve
 
 There is no separate typecheck step. CI runs `pytest` and `ruff check` on push/PR to `main` (Python 3.10–3.13); that is the gate.
 
-Build/release (maintainer): tag `v*` matching `pyproject.toml` version triggers GitHub Actions Trusted Publishing to PyPI. Local `python -m build` plus Keychain token remains a fallback for emergencies. When tagging, also bump the `google-workspace-suite-mcp==X.Y.Z` pin in `.mcp.json` and in the README (`.mcp.json` example plus the `==X.Y.Z` mention below it).
+Build/release: this fork does not publish to PyPI (the PyPI name belongs to upstream). A tag `vX.Y.Z` matching `pyproject.toml`'s version makes `.github/workflows/release.yml` build the sdist and wheel and attach them to a GitHub release. Clients install from the tag: `uvx --from git+https://github.com/outcastofmusic/google-workspace-mcp@vX.Y.Z gworkspace-mcp`. When releasing, bump `pyproject.toml` and `google_workspace_mcp/__version__` (`tests/test_version.py` checks they agree), the tag in `.mcp.json`, and every `@vX.Y.Z` in the README in the same commit, merge it, then tag `main`.
 
 ## Architecture
 

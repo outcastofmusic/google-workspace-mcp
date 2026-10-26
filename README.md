@@ -138,8 +138,13 @@ runs the Google call through shared error mapping, and returns
 
 ## Install
 
+This fork is installed from its git tags, not from PyPI: the name
+`google-workspace-suite-mcp` on PyPI is the upstream project, which has none
+of this fork's changes. Each release is a tag `vX.Y.Z` with its wheel attached
+to the GitHub release.
+
 ```bash
-pip install google-workspace-suite-mcp
+pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.0"
 ```
 
 This pulls in the shared `google-auth-core` token store and the
@@ -152,7 +157,7 @@ console scripts onto your PATH: the six servers (`gmail-mcp`, `gcal-mcp`,
 If you prefer an isolated install with [pipx](https://pipx.pypa.io):
 
 ```bash
-pipx install google-workspace-suite-mcp
+pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.0"
 ```
 
 For local development from a clone:
@@ -179,6 +184,9 @@ Console, logging in, confirming the five APIs are enabled (enable the Google
 Slides API yourself if you use `gslides-mcp`), and prints
 ready-to-paste `.mcp.json` snippets that point at locally installed scripts.
 To run the servers through `uvx` instead, use the pinned form below.
+The wizard and `doctor` come from `google-auth-core` and suggest
+`pip install google-workspace-suite-mcp` when the scripts are missing; that
+name is upstream's package, so install from the git tag above instead.
 
 You bring your **own** Google OAuth client. There is no shared client embedded
 in the package: Gmail and Drive are Google "restricted" scopes, so a shared
@@ -241,7 +249,7 @@ than blocking the protocol.
   "mcpServers": {
     "google-workspace": {
       "command": "uvx",
-      "args": ["--from", "google-workspace-suite-mcp==0.7.0", "gworkspace-mcp"]
+      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.0", "gworkspace-mcp"]
     }
   }
 }
@@ -255,15 +263,16 @@ separately instead: `gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`,
 `gdrive-mcp`, `gslides-mcp`, each as its own entry with the same `uvx --from`
 args.
 
-The `==0.7.0` pin means launches come from uv's cache after the first one:
+The `@v0.8.0` tag means launches come from uv's cache after the first one:
 fast startup, works offline until the uv cache is cleaned, and a new release
-only runs once you choose it. To upgrade, bump the version and restart Claude.
-If you'd rather get every release automatically, use this form instead, which
-checks PyPI on every launch:
+only runs once you choose it. To upgrade, change the tag and restart the
+client. To follow `main` instead, which uv fetches again on every launch:
 
 ```json
-"args": ["--refresh", "--from", "google-workspace-suite-mcp@latest", "gworkspace-mcp"]
+"args": ["--refresh", "--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@main", "gworkspace-mcp"]
 ```
+
+uv needs `git` on the machine to install from a tag.
 
 GUI clients such as Claude Desktop and Cursor do not inherit your shell PATH,
 so use the absolute `uvx` path (`which uvx`). Register at user scope to make

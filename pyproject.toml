@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "google-workspace-suite-mcp"
-version = "0.7.0"
+version = "0.8.0"
 description = "Aligned MCP servers for Gmail, Calendar, Sheets, Docs, Drive, and Slides with persistent, multi-account auth"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,8 +37,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nitaiaharoni1/google-workspace-mcp"
-Repository = "https://github.com/nitaiaharoni1/google-workspace-mcp"
+Homepage = "https://github.com/outcastofmusic/google-workspace-mcp"
+Repository = "https://github.com/outcastofmusic/google-workspace-mcp"
 
 [project.optional-dependencies]
 dev = ["pytest>=7", "pytest-anyio>=0.0.0", "anyio>=4", "ruff>=0.4"]
@@ -53,7 +53,7 @@ gdrive-mcp = "google_workspace_mcp.drive.server:main"
 gslides-mcp = "google_workspace_mcp.slides.server:main"
 gworkspace-mcp = "google_workspace_mcp.workspace.server:main"
 # Out-of-band auth CLI (from google-auth-core); shipped here so a single
-# `pipx install google-workspace-suite-mcp` also provides `google-auth login`.
+# `pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@vX.Y.Z"` also provides `google-auth login`.
 google-auth = "google_auth_core.cli:main"
 
 [tool.setuptools.packages.find]
