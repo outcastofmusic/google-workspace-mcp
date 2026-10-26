@@ -30,4 +30,4 @@ None.
 
 ## Impact
 
-`pyproject.toml`, `.mcp.json`, `README.md`, `CLAUDE.md`, `.github/workflows/release.yml`.
+`pyproject.toml`, `google_workspace_mcp/__init__.py`, `tests/test_version.py`, `.mcp.json`, `README.md`, `CLAUDE.md`, `.github/workflows/release.yml`.

@@ -184,6 +184,9 @@ Console, logging in, confirming the five APIs are enabled (enable the Google
 Slides API yourself if you use `gslides-mcp`), and prints
 ready-to-paste `.mcp.json` snippets that point at locally installed scripts.
 To run the servers through `uvx` instead, use the pinned form below.
+The wizard and `doctor` come from `google-auth-core` and suggest
+`pip install google-workspace-suite-mcp` when the scripts are missing; that
+name is upstream's package, so install from the git tag above instead.
 
 You bring your **own** Google OAuth client. There is no shared client embedded
 in the package: Gmail and Drive are Google "restricted" scopes, so a shared
