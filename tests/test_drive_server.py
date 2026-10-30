@@ -1010,3 +1010,18 @@ async def test_read_file_text_small_has_no_truncation_keys(monkeypatch):
     env = envelope(await server.mcp.call_tool("read_file_text", {"file_id": "T1"}))
     assert env["data"]["text"] == "hi"
     assert "truncated" not in env
+
+
+def test_query_strings_are_quoted(monkeypatch):
+    # Drive escapes \ and ' with a backslash inside a quoted string; a
+    # trailing \ or a ' in any argument must not end the string early.
+    api, svc = _api_with_mock(monkeypatch)
+    svc.files().list().execute.return_value = {"files": []}
+    api.search_files(name="abc\\", full_text="it's", mime_type="a'b", parent_id="P'1")
+    q = svc.files().list.call_args[1]["q"]
+    assert "name contains 'abc\\\\'" in q
+    assert "fullText contains 'it\\'s'" in q
+    assert "mimeType = 'a\\'b'" in q
+    assert "'P\\'1' in parents" in q
+    api.list_files(folder_id="F'2")
+    assert "'F\\'2' in parents" in svc.files().list.call_args[1]["q"]

@@ -228,6 +228,12 @@ def place_in_folder(drive_service, file_id: str, folder_id: str) -> None:
         raise
 
 
+def _quote(value: str) -> str:
+    """A string of a Drive query: in single quotes, with \\ and ' escaped by a
+    backslash, the backslash first so the quote's escape is not doubled."""
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
 class DriveAPI:
     def __init__(self, account=None):
         self.account = account
@@ -254,15 +260,13 @@ class DriveAPI:
         if query:
             parts.append(f"({query})")
         if name:
-            escaped = name.replace("'", "\\'")
-            parts.append(f"name contains '{escaped}'")
+            parts.append(f"name contains {_quote(name)}")
         if mime_type:
-            parts.append(f"mimeType = '{mime_type}'")
+            parts.append(f"mimeType = {_quote(mime_type)}")
         if parent_id:
-            parts.append(f"'{parent_id}' in parents")
+            parts.append(f"{_quote(parent_id)} in parents")
         if full_text:
-            escaped = full_text.replace("'", "\\'")
-            parts.append(f"fullText contains '{escaped}'")
+            parts.append(f"fullText contains {_quote(full_text)}")
         q = " and ".join(parts)
         params = self._all_drives(
             q=q,
@@ -286,7 +290,7 @@ class DriveAPI:
     ):
         q = "trashed = false"
         if folder_id:
-            q += f" and '{folder_id}' in parents"
+            q += f" and {_quote(folder_id)} in parents"
         params = self._all_drives(
             q=q,
             orderBy="modifiedTime desc",
@@ -431,7 +435,7 @@ class DriveAPI:
             token = None
             while True:
                 params = self._all_drives(
-                    q=f"trashed = false and '{current}' in parents",
+                    q=f"trashed = false and {_quote(current)} in parents",
                     pageSize=1000,
                     orderBy="folder,name",
                     fields=FOLDER_TREE_FIELDS,
