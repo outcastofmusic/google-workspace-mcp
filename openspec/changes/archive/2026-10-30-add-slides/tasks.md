@@ -18,5 +18,6 @@
 - [x] 3.1 README (the server, its tools, the outline format, the `.mcp.json` example) and CLAUDE.md (architecture block and the scope parameters). Verify: the README's outline example parses into the requests the unit test expects.
 - [x] 3.2 Run `ruff check .` and `pytest`; push, open the PR, and verify CI passes on Python 3.10-3.13.
   Note: CI passed on Python 3.10-3.13 for a4910a7 (PR #6); locally 689 passed, 11 skipped.
-- [ ] 3.3 Run the opt-in live test (`GOOGLE_MCP_LIVE=1`) that builds and deletes a deck, when a token is available; otherwise note that it was not run.
+- [x] 3.3 Run the opt-in live test (`GOOGLE_MCP_LIVE=1`) that builds and deletes a deck, when a token is available; otherwise note that it was not run.
+  Done: on 2026-10-30 the user ran `test_slides_roundtrip_live` against agis.pof@gmail.com and it passed, after enabling the Slides API in the Cloud project.
   Note: `test_slides_roundtrip_live` in `tests/test_live.py` is written but was not run: no real token was available on 2026-10-25. The box stays open until someone runs `GOOGLE_MCP_LIVE=1 pytest tests/test_live.py -k slides` with the Slides API enabled.
