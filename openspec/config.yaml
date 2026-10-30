@@ -3,7 +3,8 @@ schema: spec-driven
 context: |
   google-workspace-mcp is the user's fork of google-workspace-suite-mcp: one Python distribution
   that ships five aligned MCP servers (Gmail, Calendar, Sheets, Docs, Drive), the combined
-  gworkspace-mcp, the gcal-busy-sync CLI and the google-auth login CLI. All servers share
+  gworkspace-mcp, the retired gcal-busy-sync CLI (bj writes busy blocks) and the google-auth
+  login CLI. All servers share
   core/ (account resolution and warm-client cache, run_tool error mapping, the register
   decorator with the read-only gate, the safety policy in core/policy.py, fan-out helpers) and
   one ~/.google token store. CLAUDE.md holds the tool contract every tool follows.
