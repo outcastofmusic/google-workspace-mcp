@@ -144,7 +144,7 @@ of this fork's changes. Each release is a tag `vX.Y.Z` with its wheel attached
 to the GitHub release.
 
 ```bash
-pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.0"
+pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.1"
 ```
 
 This pulls in the shared `google-auth-core` token store and the
@@ -157,7 +157,7 @@ console scripts onto your PATH: the six servers (`gmail-mcp`, `gcal-mcp`,
 If you prefer an isolated install with [pipx](https://pipx.pypa.io):
 
 ```bash
-pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.0"
+pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.1"
 ```
 
 For local development from a clone:
@@ -249,7 +249,7 @@ than blocking the protocol.
   "mcpServers": {
     "google-workspace": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.0", "gworkspace-mcp"]
+      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.1", "gworkspace-mcp"]
     }
   }
 }
@@ -263,7 +263,7 @@ separately instead: `gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`,
 `gdrive-mcp`, `gslides-mcp`, each as its own entry with the same `uvx --from`
 args.
 
-The `@v0.8.0` tag means launches come from uv's cache after the first one:
+The `@v0.8.1` tag means launches come from uv's cache after the first one:
 fast startup, works offline until the uv cache is cleaned, and a new release
 only runs once you choose it. To upgrade, change the tag and restart the
 client. To follow `main` instead, which uv fetches again on every launch:
