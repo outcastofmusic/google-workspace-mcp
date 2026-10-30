@@ -13,7 +13,6 @@ import google_auth_core as core
 import pytest
 from mcp import Client
 
-from google_workspace_mcp.calendar import busy_sync
 from google_workspace_mcp.core import get_api, ok, register, scope
 from google_workspace_mcp.core.scope import SCOPE_KEY
 from google_workspace_mcp.core.server import build_server
@@ -218,27 +217,6 @@ def test_search_all_accounts_uses_only_scoped_ones(two_accounts, monkeypatch):
         assert [m["account"] for m in out["data"]] == ["me@work.com"]
         named = gmail_server.search_messages_all_accounts(query="x", accounts=["personal"])
     assert named["data"] == [] and "Outside scope" in named["errors"]["me@personal.com"]
-
-
-def test_busy_sync_uses_only_scoped_accounts(two_accounts, write_token, monkeypatch):
-    write_token(two_accounts, "me@third.com")
-    listed = []
-
-    class FakeCalendar:
-        def __init__(self, account):
-            self.account = account
-
-        def list_window_events(self, calendar_id, time_min, time_max):
-            listed.append(self.account)
-            return []
-
-    from google_workspace_mcp.calendar import changes_api
-
-    monkeypatch.setattr(changes_api, "CalendarChangesAPI", FakeCalendar)
-    with _Using(scope.parse({"accounts": ["work", "me@third.com"]})):
-        out = busy_sync.sync(dry_run=True)
-    assert out["accounts"] == ["me@third.com", "me@work.com"]
-    assert sorted(listed) == ["me@third.com", "me@work.com"]
 
 
 async def test_list_accounts_shows_only_scoped_accounts(two_accounts):

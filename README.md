@@ -151,8 +151,9 @@ This pulls in the shared `google-auth-core` token store and the
 `gmail-cli-oauth` / `google-calendar-cli` clients automatically, and installs
 console scripts onto your PATH: the six servers (`gmail-mcp`, `gcal-mcp`,
 `gsheets-mcp`, `gdocs-mcp`, `gdrive-mcp`, `gslides-mcp`), the combined
-`gworkspace-mcp`, `gcal-busy-sync`, and the `google-auth` CLI used to log in
-(see below).
+`gworkspace-mcp`, the `google-auth` CLI used to log in (see below), and
+`gcal-busy-sync`, which is retired and only prints how to stop it (see
+[Busy blocks moved to bj](#busy-blocks-moved-to-bj)).
 
 If you prefer an isolated install with [pipx](https://pipx.pypa.io):
 
@@ -300,38 +301,41 @@ Three read tools query every configured account in one call and merge the result
 
 Every item carries an `account` key. An account that fails appears under `errors`; the other accounts still return.
 
-## Busy-time sync across calendars
+## Busy blocks moved to bj
 
-Each calendar only knows its own meetings, so people booking your work calendar cannot see your personal appointments. `sync_busy_blocks` (Calendar server) and the `gcal-busy-sync` command mirror busy time: every busy event on one account's calendar becomes a private "Busy" block on the calendars of all your other accounts.
+[bj](https://github.com/outcastofmusic/bujo-md) writes the busy blocks now. `bj sync` keeps one private `Busy` event on each local account's calendar for every timed event of your other accounts, and deletes every block that carries the marker `gwmcp_block` but that bj did not write. This package used the same marker, so its `sync_busy_blocks` tool and `gcal-busy-sync` command would delete bj's blocks and bj would delete theirs. Since 2026-10-30 (change `retire-busy-sync`):
 
-- **Only the time slot is copied.** A block has no title, description, location or attendees from its source, and its visibility is private.
-- **Real events are never changed.** Blocks carry a private marker; the sync creates, moves and deletes only marked events, and never treats a block as a source.
-- **Skipped:** free (transparent) events, declined invitations, cancelled events, working-location events and, unless `include_all_day` is set, all-day events. A meeting already on a calendar gets no block there.
-- **One calendar per account:** the primary calendar, unless you name another. That calendar is both read for busy time and written with blocks. Find IDs with `list_calendars`.
-- **Window:** now to `days_ahead` days ahead (default 14, maximum 90).
-- **Failure-safe:** if any account cannot be listed, that run creates and moves blocks but deletes none.
+- The Calendar server and `gworkspace-mcp` no longer have `sync_busy_blocks`, in any toolset, with or without `GOOGLE_MCP_READONLY`. `freebusy_query` and `find_available_slots` still read availability.
+- `gcal-busy-sync` still installs, so a schedule left behind says what to do instead of failing with "command not found". With any arguments, `--dry-run` included, it calls no Google API, prints the steps below to stderr, and exits with status 2.
+- `google_workspace_mcp.calendar.busy_sync` keeps the names bj shares: `MARKER = "gwmcp_block"` (value `"1"`) and `KEY = "gwmcp_key"` in an event's `extendedProperties.private`, and `is_block(event)`. bj stores its event id, `<alias>-<16 hex digits>` such as `kaizen-0123456789abcdef`, under `gwmcp_key`; this package stored a 32-hex-digit hash there.
 
-Run it once to check the plan, then on a schedule:
+**Switch over, on each computer that ran the old sync:**
 
-```bash
-gcal-busy-sync --dry-run                 # show what would change
-gcal-busy-sync                           # sync once (all accounts)
-gcal-busy-sync --accounts work personal  # only these accounts
-gcal-busy-sync --calendar work=team@group.calendar.google.com  # non-primary calendar for "work"
-gcal-busy-sync --interval 10             # keep running, sync every 10 minutes
-```
+1. Stop the schedule. Use the line that matches how you set it up:
 
-Scheduled with cron (every 10 minutes):
+   ```bash
+   # systemd: find the unit, whatever you named it
+   systemctl --user list-units --all | grep -i busy
+   systemctl --user list-unit-files | grep -i busy
+   systemctl --user disable --now <unit>.service <unit>.timer
+   systemctl --user list-timers --all | grep -i busy      # check: no output
 
-```
-*/10 * * * * /path/to/gcal-busy-sync >> ~/.gcal-busy-sync.log 2>&1
-```
+   # cron: delete the gcal-busy-sync line
+   crontab -e
 
-From the agent, pass the same choice as `calendars={"work": "team@group.calendar.google.com"}`.
+   # macOS launchd: unload the agent, then delete the .plist or move it out of LaunchAgents
+   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/<the agent>.plist
+   rm ~/Library/LaunchAgents/<the agent>.plist
 
-If you later switch an account to a different calendar, the blocks already on the old calendar stay there; delete them by hand (they are the private "Busy" events).
+   # a loop started with --interval
+   pkill -f gcal-busy-sync
+   ```
 
-Use the absolute path from `which gcal-busy-sync`; cron does not load your shell PATH. On macOS, a launchd agent with `StartInterval` 600 does the same while you are logged in.
+   A loop started with `--interval` keeps running the old code after you upgrade, so stop it by hand.
+2. Move each MCP client off the old sync. No release holds this change yet, so either pin `@main` or a commit SHA in the client's `uvx --from git+https://github.com/outcastofmusic/google-workspace-mcp@<ref> ...` (and reinstall `gcal-busy-sync` the same way if you installed it with pip or pipx), or keep v0.8.1 and never call `sync_busy_blocks`, which v0.8.1 and earlier still list. Once a release with this change exists, pin its tag.
+3. Name your accounts in bj's `.bj/calendars.json` and run `bj sync --dry-run`, then `bj sync`. bj deletes the old blocks of this package on the calendars of the accounts that are local on that computer. Its README's Calendars section has the details.
+
+Old blocks stay on every calendar that no computer's `.bj/calendars.json` syncs: an account that file does not name, or a non-primary calendar you passed to the old sync with `--calendar` or `calendars` while bj syncs another. Delete them by hand: they are private events titled `Busy` (or the `--summary` you chose). When an account's `calendar` in `.bj/calendars.json` names that non-primary calendar, bj cleans it as it cleans a primary one.
 
 ## Read-only mode
 
@@ -384,7 +388,7 @@ A client that serves several projects from one server process can limit each too
 
 Both parts are optional, and each limits only when present:
 
-- `accounts` (emails or aliases): every tool refuses an account outside the list, reads as well as writes. Tools that span accounts (`*_all_accounts`, `sync_busy_blocks`) use only the listed accounts, and `list_accounts` lists only them.
+- `accounts` (emails or aliases): every tool refuses an account outside the list, reads as well as writes. Tools that span accounts (`*_all_accounts`) use only the listed accounts, and `list_accounts` lists only them.
 - `drive_folders` (`{account, id}` pairs): Drive, Docs, Sheets and Slides tools refuse any `file_id`, `file_ids`, `folder_id`, `parent_id`, `new_parent_id`, `document_id`, `spreadsheet_id` or `presentation_id` that is not one of the account's scope folders or below one through its parent folders (also inside the `items` of the batch tools). A file only shared with the user has no parent in the account's view, so it is outside. `list_drives`, `list_changes` (which lists changes across the whole Drive, file names included) and a `drive_id` argument are refused. `search_files`, `list_files` and `search_files_all_accounts` return only files inside the scope, so a page may hold fewer than `page_size` files while `next_page_token` still continues. Tools that create a file must name a parent inside the scope: `parent_id` for `upload_file`, `create_folder`, `copy_file` and `batch_create_folders` items, `folder_id` for `create_document`, `create_document_from_markdown`, `create_spreadsheet`, `create_presentation` and `create_presentation_from_outline`. Gmail and Calendar tools are limited by `accounts` only.
 
 A refused call returns an error starting `Outside scope:` that names the account, file or missing parameter. A scope of the wrong shape fails the call with an error naming the problem. A call without a scope behaves as before; set `GOOGLE_MCP_REQUIRE_SCOPE=1` to refuse such calls when every client is known to send one. With `GOOGLE_MCP_AUDIT_LOG` set, each entry records the call's `scope` (`null` without one).

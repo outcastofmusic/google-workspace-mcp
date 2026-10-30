@@ -66,8 +66,8 @@ async def test_tool_list_includes_expected_names():
 async def test_tool_count():
     tools = await server.mcp.list_tools()
     # 3 common + 13 read (incl. list_events_all_accounts)
-    # + 13 write (incl. sync_busy_blocks) + 3 destructive = 32
-    assert len(tools) == 32
+    # + 12 write + 3 destructive = 31 (sync_busy_blocks retired: bj writes busy blocks)
+    assert len(tools) == 31
 
 
 # ---------------------------------------------------------------------------

@@ -34,6 +34,10 @@ google_workspace_mcp/
              scope (client scope from _meta: accounts, Drive folders)
   gmail/     server.py + changes_api.GmailChangesAPI (subclass)  -> gmail-mcp
   calendar/  server.py + changes_api.CalendarChangesAPI        -> gcal-mcp
+             + busy_sync.py: the busy-block marker bj shares (MARKER
+               "gwmcp_block", KEY "gwmcp_key"; keep both names) and the retired
+               gcal-busy-sync, which refuses and exits 2. bj is the only writer of
+               busy blocks: add no tool that creates, moves or deletes them
   sheets/    server.py + sheets_api.SheetsAPI (Sheets v4)      -> gsheets-mcp
   docs/      server.py + docs_api.DocsAPI (Docs v1)            -> gdocs-mcp
   drive/     server.py + drive_api.DriveAPI (Drive v3)         -> gdrive-mcp
