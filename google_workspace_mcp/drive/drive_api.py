@@ -228,11 +228,11 @@ def place_in_folder(drive_service, file_id: str, folder_id: str) -> None:
         raise
 
 
-
 def _quote(value: str) -> str:
     """A string of a Drive query: in single quotes, with \\ and ' escaped by a
     backslash, the backslash first so the quote's escape is not doubled."""
     return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
 
 class DriveAPI:
     def __init__(self, account=None):
