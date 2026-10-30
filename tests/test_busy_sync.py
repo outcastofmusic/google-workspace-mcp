@@ -21,7 +21,7 @@ def test_marker_names_match_bj():
 
 
 def test_is_block_reads_the_marker():
-    block = {"extendedProperties": {"private": {"gwmcp_block": "1", "gwmcp_key": "^gc-kaizen-0123"}}}
+    block = {"extendedProperties": {"private": {"gwmcp_block": "1", "gwmcp_key": "kaizen-0123456789abcdef"}}}
     assert busy_sync.is_block(block)
     assert not busy_sync.is_block({"summary": "Busy"})
     assert not busy_sync.is_block({"extendedProperties": {"private": {"gwmcp_block": "0"}}})
@@ -29,29 +29,70 @@ def test_is_block_reads_the_marker():
 
 # --- the retired command -----------------------------------------------------
 
+_STOP_SYSTEMD = (
+    "systemctl --user list-units --all | grep -i busy",
+    "systemctl --user list-unit-files | grep -i busy",
+    "systemctl --user disable --now <unit>.service <unit>.timer",
+)
+
+
+def _assert_refusal(err: str) -> None:
+    assert "retired" in err and "bj sync" in err
+    for line in _STOP_SYSTEMD:
+        assert line in err
+    assert "launchctl bootout" in err and ".plist" in err
+
+
 @pytest.mark.parametrize(
-    "argv",
-    [[], ["--dry-run"], ["--interval", "10"], ["--accounts", "work", "personal"], ["--help"]],
+    "argv", [[], ["--dry-run"], ["--accounts", "work", "personal"], ["--help"]],
 )
 def test_command_refuses_and_writes_nothing(argv, capsys, monkeypatch):
+    import google_auth_core
+
     from google_workspace_mcp.core import runtime
 
     def no_google(*args, **kwargs):
         raise AssertionError("gcal-busy-sync must not reach Google")
 
+    monkeypatch.setattr(google_auth_core, "get_service", no_google)
     monkeypatch.setattr(runtime, "get_api", no_google)
-    monkeypatch.setattr(runtime, "get_service", no_google, raising=False)
     assert busy_sync.main(argv) == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "retired" in captured.err and "bj sync" in captured.err
-    assert "systemctl --user disable --now gcal-busy-sync.timer" in captured.err
+    _assert_refusal(captured.err)
+
+
+# Runs main with Google's client factory made to fail, so code that reached
+# Google would exit 1 with the AssertionError instead of 2.
+_NO_GOOGLE = (
+    "import sys, google_auth_core\n"
+    "def no_google(*a, **k):\n"
+    "    raise AssertionError('gcal-busy-sync must not reach Google')\n"
+    "google_auth_core.get_service = no_google\n"
+    "from google_workspace_mcp.calendar.busy_sync import main\n"
+    "raise SystemExit(main(sys.argv[1:]))\n"
+)
+
+
+def test_interval_loop_exits_at_once():
+    # The old code slept and looped forever here; the timeout fails it instead of hanging.
+    out = subprocess.run(
+        [sys.executable, "-c", _NO_GOOGLE, "--interval", "10"],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert out.returncode == 2, out.stderr
+    assert out.stdout == ""
+    _assert_refusal(out.stderr)
 
 
 def test_console_script_exits_2():
-    code = "from google_workspace_mcp.calendar.busy_sync import main; raise SystemExit(main())"
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
-    assert out.returncode == 2
+    from importlib.metadata import entry_points
+
+    (script,) = entry_points(group="console_scripts", name="gcal-busy-sync")
+    assert script.value == "google_workspace_mcp.calendar.busy_sync:main"
+    assert script.load() is busy_sync.main
+    out = subprocess.run([sys.executable, "-c", _NO_GOOGLE], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 2, out.stderr
     assert "bj sync" in out.stderr
 
 

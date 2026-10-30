@@ -47,6 +47,7 @@ None. `client-scope` never named `sync_busy_blocks`; the README's scope section 
 `tests/test_calendar_server.py` (tool count 32 to 31), `tests/test_scope.py` (the busy-sync scope
 test goes with the sync), README, CLAUDE.md, `openspec/config.yaml`.
 
-Users: a client pinned to v0.8.1 or earlier still lists `sync_busy_blocks` until it moves to a
+Users: until a release holds this change, clients pin `@main` or a commit SHA, or stay on v0.8.1
+and never call `sync_busy_blocks`. A client pinned to v0.8.1 or earlier still lists it until it moves to a
 version with this change. An installed schedule keeps failing with status 2 until the user stops
 it; the message says how.

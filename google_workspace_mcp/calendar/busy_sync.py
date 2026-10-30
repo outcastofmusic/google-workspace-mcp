@@ -9,7 +9,8 @@ run (change ``retire-busy-sync``, 2026-10-30).
 
 The marker below is the contract bj shares. A block is an event whose
 ``extendedProperties.private`` holds ``gwmcp_block = "1"``; bj stores its event
-id (``^gc-<alias>-<key>``) under ``gwmcp_key``. Older versions of this package
+id, ``<alias>-<16 hex digits>`` (``kaizen-0123456789abcdef``), under
+``gwmcp_key``. Older versions of this package
 stored a 32-hex-digit hash there, so bj treats those blocks as not its own and
 deletes them. Keep both names unchanged, or bj stops recognizing its blocks.
 """
@@ -26,9 +27,13 @@ RETIRED_MESSAGE = """\
 gcal-busy-sync is retired and changed nothing.
 bj now writes the busy blocks: run `bj sync` (see the Calendars section of bj's README).
 Two writers delete each other's blocks, so stop this command's schedule:
-  systemd: systemctl --user disable --now gcal-busy-sync.timer
+  systemd: find the unit with
+             systemctl --user list-units --all | grep -i busy
+             systemctl --user list-unit-files | grep -i busy
+           then: systemctl --user disable --now <unit>.service <unit>.timer
   cron:    crontab -e, then delete the gcal-busy-sync line
-  launchd: launchctl bootout gui/$(id -u) <path to the agent's .plist>
+  launchd: launchctl bootout gui/$(id -u) <path to the agent's .plist>,
+           then delete the .plist or move it out of ~/Library/LaunchAgents
   a loop started with --interval: pkill -f gcal-busy-sync
 Details: "Busy blocks moved to bj" in the google-workspace-mcp README."""
 

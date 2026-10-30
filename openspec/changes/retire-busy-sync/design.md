@@ -5,7 +5,7 @@
 Two programs wrote busy blocks with one marker. This package (since the busy sync was added)
 plans blocks per account from the events it lists, keyed by a SHA-256 of the source's iCalUID and
 original start, and deletes marked blocks whose key it did not plan. bj (`internal/calsync.Blocks`)
-plans blocks from the journal's `^gc-` lines, keyed by the event id, and deletes marked blocks
+plans blocks from the journal's `^gc-` lines, keyed by the event id `<alias>-<16 hex>`, and deletes marked blocks
 whose key it did not plan. bj also sees the other laptop's accounts through git, which this
 package cannot, so bj is the writer to keep. bj reads `gwmcp_block` and `gwmcp_key` by name, so
 the names must not change.
@@ -39,7 +39,8 @@ no input but its arguments, which it ignores.
   absent under `GOOGLE_MCP_READONLY` and a confirming client asks first.
 - [An `--interval` loop started before the upgrade keeps running old code] → the message and the
   README say `pkill -f gcal-busy-sync`.
-- [Blocks on a calendar bj does not sync stay] → README says to delete them by hand.
+- [Blocks on a calendar no computer's `.bj/calendars.json` syncs stay] → README says to delete them by hand, or to point the account's `calendar` at that calendar so bj cleans it.
+- [The systemd unit may not be named `gcal-busy-sync`] → the message and README find it with `systemctl --user list-units --all` and `list-unit-files` rather than assume a name.
 - [bj changes its marker] → bj's spec names `gwmcp_block` and `gwmcp_key`; `test_marker_names_match_bj`
   pins this side.
 

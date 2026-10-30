@@ -17,12 +17,13 @@ SHALL hide and show the other tools as before.
 ### Requirement: Retired busy-sync command
 `gcal-busy-sync` SHALL stay installed as a console script. With any arguments it SHALL call no
 Google API, print nothing to stdout, print to stderr that it is retired, that bj writes the blocks
-through `bj sync`, and how to stop a systemd timer, a cron line, a launchd agent and an
-`--interval` loop, and exit with status 2.
+through `bj sync`, and how to stop a systemd timer (found by name, not assumed), a cron line, a
+launchd agent (unloaded, then its `.plist` removed) and an `--interval` loop, and exit with
+status 2.
 
 #### Scenario: Timer left behind
 - **WHEN** a systemd timer runs `gcal-busy-sync --interval 10` after the upgrade
-- **THEN** the command exits 2 at once, changes no calendar, and its log names `bj sync` and `systemctl --user disable --now gcal-busy-sync.timer`
+- **THEN** the command exits 2 at once, changes no calendar, and its log names `bj sync`, how to find the unit with `systemctl --user list-units --all | grep -i busy`, and `systemctl --user disable --now <unit>.service <unit>.timer`
 
 #### Scenario: Dry run
 - **WHEN** the user runs `gcal-busy-sync --dry-run`
@@ -34,5 +35,5 @@ through `bj sync`, and how to stop a systemd timer, a cron line, a launchd agent
 true when the event's `gwmcp_block` is `"1"`. Their documentation SHALL say bj depends on them.
 
 #### Scenario: bj's block
-- **WHEN** `is_block` gets an event whose private properties are `gwmcp_block = "1"` and `gwmcp_key = "^gc-kaizen-0123"`
+- **WHEN** `is_block` gets an event whose private properties are `gwmcp_block = "1"` and `gwmcp_key = "kaizen-0123456789abcdef"`
 - **THEN** it returns true, and an event without `gwmcp_block = "1"` returns false

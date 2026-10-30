@@ -307,25 +307,35 @@ Every item carries an `account` key. An account that fails appears under `errors
 
 - The Calendar server and `gworkspace-mcp` no longer have `sync_busy_blocks`, in any toolset, with or without `GOOGLE_MCP_READONLY`. `freebusy_query` and `find_available_slots` still read availability.
 - `gcal-busy-sync` still installs, so a schedule left behind says what to do instead of failing with "command not found". With any arguments, `--dry-run` included, it calls no Google API, prints the steps below to stderr, and exits with status 2.
-- `google_workspace_mcp.calendar.busy_sync` keeps the names bj shares: `MARKER = "gwmcp_block"` (value `"1"`) and `KEY = "gwmcp_key"` in an event's `extendedProperties.private`, and `is_block(event)`. bj stores its event id (`^gc-<alias>-<key>`) under `gwmcp_key`; this package stored a 32-hex-digit hash there.
+- `google_workspace_mcp.calendar.busy_sync` keeps the names bj shares: `MARKER = "gwmcp_block"` (value `"1"`) and `KEY = "gwmcp_key"` in an event's `extendedProperties.private`, and `is_block(event)`. bj stores its event id, `<alias>-<16 hex digits>` such as `kaizen-0123456789abcdef`, under `gwmcp_key`; this package stored a 32-hex-digit hash there.
 
 **Switch over, on each computer that ran the old sync:**
 
 1. Stop the schedule. Use the line that matches how you set it up:
 
    ```bash
-   systemctl --user disable --now gcal-busy-sync.timer   # systemd user timer
-   systemctl --user list-timers | grep -i busy            # check: no output
-   crontab -e                                             # cron: delete the gcal-busy-sync line
-   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/<the agent>.plist   # macOS launchd
-   pkill -f gcal-busy-sync                                # a loop started with --interval
+   # systemd: find the unit, whatever you named it
+   systemctl --user list-units --all | grep -i busy
+   systemctl --user list-unit-files | grep -i busy
+   systemctl --user disable --now <unit>.service <unit>.timer
+   systemctl --user list-timers --all | grep -i busy      # check: no output
+
+   # cron: delete the gcal-busy-sync line
+   crontab -e
+
+   # macOS launchd: unload the agent, then delete the .plist or move it out of LaunchAgents
+   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/<the agent>.plist
+   rm ~/Library/LaunchAgents/<the agent>.plist
+
+   # a loop started with --interval
+   pkill -f gcal-busy-sync
    ```
 
    A loop started with `--interval` keeps running the old code after you upgrade, so stop it by hand.
-2. Upgrade the package, or point each client's `uvx --from git+...@<tag>` at a version with this change. Until then a client running v0.8.1 or earlier still lists `sync_busy_blocks`; do not call it.
+2. Move each MCP client off the old sync. No release holds this change yet, so either pin `@main` or a commit SHA in the client's `uvx --from git+https://github.com/outcastofmusic/google-workspace-mcp@<ref> ...` (and reinstall `gcal-busy-sync` the same way if you installed it with pip or pipx), or keep v0.8.1 and never call `sync_busy_blocks`, which v0.8.1 and earlier still list. Once a release with this change exists, pin its tag.
 3. Name your accounts in bj's `.bj/calendars.json` and run `bj sync --dry-run`, then `bj sync`. bj deletes the old blocks of this package on the calendars of the accounts that are local on that computer. Its README's Calendars section has the details.
 
-Blocks on a calendar that bj does not sync, such as a non-primary calendar you passed with `--calendar` or `calendars`, stay where they are. Delete them by hand: they are private events titled `Busy` (or the `--summary` you chose).
+Old blocks stay on every calendar that no computer's `.bj/calendars.json` syncs: an account that file does not name, or a non-primary calendar you passed to the old sync with `--calendar` or `calendars` while bj syncs another. Delete them by hand: they are private events titled `Busy` (or the `--summary` you chose). When an account's `calendar` in `.bj/calendars.json` names that non-primary calendar, bj cleans it as it cleans a primary one.
 
 ## Read-only mode
 
