@@ -144,7 +144,7 @@ of this fork's changes. Each release is a tag `vX.Y.Z` with its wheel attached
 to the GitHub release.
 
 ```bash
-pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.1"
+pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0"
 ```
 
 This pulls in the shared `google-auth-core` token store and the
@@ -158,7 +158,7 @@ console scripts onto your PATH: the six servers (`gmail-mcp`, `gcal-mcp`,
 If you prefer an isolated install with [pipx](https://pipx.pypa.io):
 
 ```bash
-pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.1"
+pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0"
 ```
 
 For local development from a clone:
@@ -250,7 +250,7 @@ than blocking the protocol.
   "mcpServers": {
     "google-workspace": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.8.1", "gworkspace-mcp"]
+      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0", "gworkspace-mcp"]
     }
   }
 }
@@ -264,7 +264,7 @@ separately instead: `gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`,
 `gdrive-mcp`, `gslides-mcp`, each as its own entry with the same `uvx --from`
 args.
 
-The `@v0.8.1` tag means launches come from uv's cache after the first one:
+The `@v0.9.0` tag means launches come from uv's cache after the first one:
 fast startup, works offline until the uv cache is cleaned, and a new release
 only runs once you choose it. To upgrade, change the tag and restart the
 client. To follow `main` instead, which uv fetches again on every launch:
@@ -332,7 +332,7 @@ Every item carries an `account` key. An account that fails appears under `errors
    ```
 
    A loop started with `--interval` keeps running the old code after you upgrade, so stop it by hand.
-2. Move each MCP client off the old sync. No release holds this change yet, so either pin `@main` or a commit SHA in the client's `uvx --from git+https://github.com/outcastofmusic/google-workspace-mcp@<ref> ...` (and reinstall `gcal-busy-sync` the same way if you installed it with pip or pipx), or keep v0.8.1 and never call `sync_busy_blocks`, which v0.8.1 and earlier still list. Once a release with this change exists, pin its tag.
+2. Move each MCP client to v0.9.0 or later: pin `@v0.9.0` in the client's `uvx --from git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0 ...` (and reinstall `gcal-busy-sync` the same way if you installed it with pip or pipx). v0.8.1 and earlier still list `sync_busy_blocks`; never call it there.
 3. Name your accounts in bj's `.bj/calendars.json` and run `bj sync --dry-run`, then `bj sync`. bj deletes the old blocks of this package on the calendars of the accounts that are local on that computer. Its README's Calendars section has the details.
 
 Old blocks stay on every calendar that no computer's `.bj/calendars.json` syncs: an account that file does not name, or a non-primary calendar you passed to the old sync with `--calendar` or `calendars` while bj syncs another. Delete them by hand: they are private events titled `Busy` (or the `--summary` you chose). When an account's `calendar` in `.bj/calendars.json` names that non-primary calendar, bj cleans it as it cleans a primary one.
