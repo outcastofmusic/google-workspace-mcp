@@ -36,6 +36,18 @@ Every tool: takes `account`, resolves it, gets a cached per-account client,
 runs the Google call through shared error mapping, and returns
 `{"ok": true, "account": "<resolved>", "data": ...}`.
 
+### Calendar (`gcal-mcp`)
+
+- **Short event records** — `list_events`, `search_events`,
+  `get_recurring_event_instances` and `list_events_all_accounts` return each event as
+  `id`, `summary`, `start` and `end`, plus `status`, `location`, `description`,
+  `attendees`, `organizer`, `video`, `recurring_event_id` and `event_type` when the event
+  has them. `start` and `end` are the `dateTime`, or the `date` of an all-day event. The
+  description is plain text cut at 200 characters, the attendees carry their name and
+  response, and `video` is the Meet link or another conference's video link. On a
+  recorded work day, 15 events came to 5,508 characters, against 21,412 for Google's raw
+  resource. `get_event` returns the whole event, `htmlLink` and `conferenceData` included.
+
 ### Docs (`gdocs-mcp`)
 
 - **Markdown in/out** — `create_document_from_markdown`, `append_markdown`, and
@@ -144,7 +156,7 @@ of this fork's changes. Each release is a tag `vX.Y.Z` with its wheel attached
 to the GitHub release.
 
 ```bash
-pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0"
+pip install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.10.0"
 ```
 
 This pulls in the shared `google-auth-core` token store and the
@@ -158,7 +170,7 @@ console scripts onto your PATH: the six servers (`gmail-mcp`, `gcal-mcp`,
 If you prefer an isolated install with [pipx](https://pipx.pypa.io):
 
 ```bash
-pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0"
+pipx install "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.10.0"
 ```
 
 For local development from a clone:
@@ -250,7 +262,7 @@ than blocking the protocol.
   "mcpServers": {
     "google-workspace": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.9.0", "gworkspace-mcp"]
+      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.10.0", "gworkspace-mcp"]
     }
   }
 }
@@ -264,7 +276,7 @@ separately instead: `gmail-mcp`, `gcal-mcp`, `gsheets-mcp`, `gdocs-mcp`,
 `gdrive-mcp`, `gslides-mcp`, each as its own entry with the same `uvx --from`
 args.
 
-The `@v0.9.0` tag means launches come from uv's cache after the first one:
+The `@v0.10.0` tag means launches come from uv's cache after the first one:
 fast startup, works offline until the uv cache is cleaned, and a new release
 only runs once you choose it. To upgrade, change the tag and restart the
 client. To follow `main` instead, which uv fetches again on every launch:

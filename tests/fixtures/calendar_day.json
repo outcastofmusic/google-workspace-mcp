@@ -1,0 +1,553 @@
+[
+ {
+  "kind": "calendar#event",
+  "etag": "\"t87woqtmh3gz41ey\"",
+  "id": "tuuvpn7nvfbci706mvsw9qwhd6",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=igawg1fdlji844ooitlqyh83r8s9nm69wsb9hpdjiigzxtbglnp9uqlg9d4g8mhr",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=lq4firzqdif17kln243zcgvu\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id hpmq1ldiw6hsodv#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T09:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T11:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "fdivkd6a5voxzfb4t4al707di3@sc2wtb.lld",
+  "sequence": 1,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"gc11khu0ugk03xqc\"",
+  "id": "qrd5natl2ais8y9ycnntlevrqu",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=a6rw31x903101ew4m6zubmzxc6j38e9iwr6kqtghnir4m0tm5lkg4a51c9cvk0nx",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id 2t12r1p79a2tygh#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T09:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T10:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "gv714za3aljulv4lg9crpjui8c@t08ijh.x3t",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"uzcznbdgetarf1ma\"",
+  "id": "r0q0vtrbwrmayojgy584gqg6h2",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=jrlbb6wwjonnasrxywopxkrzkrt8z7wkmlxily0pe4rb12lxqdqpo6zyz8nbmg6y",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id 2yarlo43flvrlp4#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T09:55:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T10:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "o50c46he6oellqsxisv0xfns0j@qiynfw.snm",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"4mr29o0ehdqwfr9d\"",
+  "id": "f2kyh1prjkdblm7meru45uso4f",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=97r1b696xyw1jbge9jgkrucz8ktdw6b5n5vu03tpag42wsxfmolzsqwgz3a5oj27",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id ifizvpgy048mk4d#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T10:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T12:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "6pe9k654f84oqkywkyn3lfw758@ssvqrv.a13",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"9hcmdgjwobdu5hc8\"",
+  "id": "cw920nfie0lt382l2lvll9o5gh_5d9qhce62laxk325",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=sfsfwshgvejprzfvr1dkg64j9fz939ubwg7zha9hgydglhabpr2i7rl2vp4myu3uqvghphm8vndchyze335j5f8",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "dwvuo znfh",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T10:35:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T10:55:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "recurringEventId": "1ps5e8anqoxmu2bzztxwi5jlk1_5kh2sd2o8cpzqh9h",
+  "originalStartTime": {
+   "dateTime": "2026-01-05T10:35:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "visibility": "public",
+  "iCalUID": "cnt1xkt1tsjx9azpw1qk0kl1ss_wl5heqihn02fd0u1@xe07yk.esk",
+  "sequence": 0,
+  "attendees": [
+   {
+    "email": "ix2m@xxxxxxxxxxxx.org",
+    "organizer": true,
+    "self": true,
+    "responseStatus": "accepted"
+   },
+   {
+    "email": "7knic9u7yl@xxxxxxxxxxxx.org",
+    "responseStatus": "accepted"
+   }
+  ],
+  "hangoutLink": "https://meet.google.com/tkn-mjek-gnv",
+  "conferenceData": {
+   "createRequest": {
+    "requestId": "54e7081a-aa96-4080-a690-8613992cce55",
+    "conferenceSolutionKey": {
+     "type": "hangoutsMeet"
+    },
+    "status": {
+     "statusCode": "success"
+    }
+   },
+   "entryPoints": [
+    {
+     "entryPointType": "video",
+     "uri": "https://meet.google.com/tkn-mjek-gnv",
+     "label": "meet.google.com/tkn-mjek-gnv"
+    },
+    {
+     "entryPointType": "more",
+     "uri": "https://tel.meet/tkn-mjek-gnv?pin=6173571594051",
+     "pin": "6173571594051"
+    },
+    {
+     "regionCode": "US",
+     "entryPointType": "phone",
+     "uri": "tel:+1-980-505-7871",
+     "label": "+1 980-505-7871",
+     "pin": "496051123"
+    }
+   ],
+   "conferenceSolution": {
+    "key": {
+     "type": "hangoutsMeet"
+    },
+    "name": "Google Meet",
+    "iconUri": "https://fonts.gstatic.com/s/i/productlogos/meet_2020q4/v6/web-512dp/logo_meet_2020q4_color_2x_web_512dp.png"
+   },
+   "conferenceId": "tkn-mjek-gnv"
+  },
+  "reminders": {
+   "useDefault": true
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"aaj39898v1reivsc\"",
+  "id": "p3pxinggb9hyjo7wci25z7okpc",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=mdrzu7vygk0smzccf8yqdaj0u35ucyogepviaijf1tjampo05vx5a2dx9ihdabfd",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id elzev69ruy9bvu1#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T11:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T11:15:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "3pgmwvpjnc33lopau61jmddyzo@2huwp0.7rc",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"rkraq8e02rtg15m1\"",
+  "id": "qir7pdsxmmbpr23w9crka107tm",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=2o0w8tf62y2a6bb7vezzlib40f60w3am7nlcgmqlbor4vld3y58m26iv6vmvd1oj",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=lq4firzqdif17kln243zcgvu\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id qpzmnrvppuz1w4j#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T14:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T15:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "7k1srf9noswdyo98l134hiq06a@skh9un.rka",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"zkhqejlsixv9nor4\"",
+  "id": "6f0nbgqhebjaq63qxaklhgqmp2",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=w4aoyc190j49v7hoj2y0hvjnxnmxu13mgx6zznfh9p6b4m9hrfvxkll4fhm8p7tl",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id kbjvyp4ykihrohk#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T15:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T15:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "bewk5d84j8e6dyssrna6iwd1s8@65napy.wuy",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"wxeijxlb3bylmmiw\"",
+  "id": "ptjfztbl7zw57singstih356o6",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=tjkze9x2cobmvhphcv3xnne7e0rnyp437jwtpxye24amdc17tagov4iflyogo3b0",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id k8ir93xsxfg1jld#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T15:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T16:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "hjv8o0qhu1ib4d4vjtq6c6l4l4@04e6yn.4sf",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"3jac3xkco3u4ides\"",
+  "id": "ri62hqp0x4pxbtculltl2jdclh",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=8u806jlpaisby61vq7f1gnng695m2no2ehckscxfh3jnsorc4ygjtmx7gv5wso85",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id p2d0hubb0yyjali#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T16:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T16:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "dkxoatt0amfizkykkyc8hi9ddl@ovq0ie.qb8",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"e1xcoz80rwqihd7c\"",
+  "id": "4lj4wb3l0jfdjhgu7yobt189o3",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=050xyb3cqfpm1m20psy2qycklvb9movy0j00o8hcexw14yk8ssgfsb0xglkmldyw",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id 29j7fvoa90ltxvt#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T16:30:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T17:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "qconi7sjpw7ns00wqjmrh5g3nl@xgymg9.ieb",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"b6vfig9x3luze9yl\"",
+  "id": "1tqtl6tssxasrwy36dlmw1n8ka",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=2lrrgbce1kk5hvhhiahllr3u2418dy3gwkly2bvp87ijjpxxyw6z52xhyeoepnnx",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=lq4firzqdif17kln243zcgvu\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id poluzfw35hj3dwm#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T17:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T18:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "r2h38qbx6izjgczt0jguy3t6z1@mn5rjk.f5m",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"0i6gv1d8rlyxu2a2\"",
+  "id": "f311ateibsmfo7e7nnyi79a0gu",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=pt5havyh78br9zgmy3rydeen4eel0a3vkb1z3krv8v6voa6k6fhmvu0o88r773qt",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id zvjl24gdlhcpq97#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T18:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T18:05:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "tmmu7ul1495knszy3h6cbvg1iw@sancs3.zpn",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"u0b1jwmpw19s2z4h\"",
+  "id": "s96n3g9v59ylhapfrmvlfxs90o",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=scbupz9dh7xyi2pqpb36s72s1la56xo72khnndkw6eldoxj8m5tm0wbe1xom3peb",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=xvywpip8ib7hi0jlnm8yzkop\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id xh3qieia1ie5b4w#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T18:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T19:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "58blq27z5yubnrezs5zvbo98f0@jplcy4.dnv",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ },
+ {
+  "kind": "calendar#event",
+  "etag": "\"kjffeygrtqh4gjgg\"",
+  "id": "uat897f08bwfopoovksob9l0ff",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=8gxu8laq10uuizqm54l8iiowmy1l2y36h82r756rr2c5gllacp9q5v6zfbmo7ykq",
+  "created": "2025-12-01T09:00:00.000Z",
+  "updated": "2025-12-01T09:00:00.000Z",
+  "summary": "Busy (via Morgen)",
+  "description": "<p>This event was created via <a href=\"https://platform.morgen.so?ref=event&wid=lq4firzqdif17kln243zcgvu\" target='_blank' rel=\"noopener noreferrer nofollow\">Morgen Assist</a>.</p><p></p><p>Do not remove the following information</p><p>Ref-Group-Id 9w6wefgojkq6yic#</p><p>Calendar Propagation</p><p>~~~~~~~~~~~~~~</p>",
+  "creator": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "organizer": {
+   "email": "ix2m@xxxxxxxxxxxx.org",
+   "self": true
+  },
+  "start": {
+   "dateTime": "2026-01-05T18:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "end": {
+   "dateTime": "2026-01-05T20:00:00+02:00",
+   "timeZone": "Europe/Athens"
+  },
+  "iCalUID": "ct2c8o4z3ove248w3tgv9dbzcp@w74r5a.zzs",
+  "sequence": 0,
+  "reminders": {
+   "useDefault": false
+  },
+  "eventType": "default"
+ }
+]
