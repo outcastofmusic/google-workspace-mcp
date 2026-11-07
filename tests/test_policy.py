@@ -37,7 +37,8 @@ def _tool(name="send_message", mutating=True):
     tool.__name__ = name
     register(mcp, mutating=mutating)(tool)
     registered = mcp.tools[name]
-    return lambda **kw: anyio.run(functools.partial(registered, **kw))
+    # The registered wrapper sends compact JSON text (compact-tool-json); read it as a client does.
+    return lambda **kw: json.loads(anyio.run(functools.partial(registered, **kw)).content[0].text)
 
 
 @pytest.fixture

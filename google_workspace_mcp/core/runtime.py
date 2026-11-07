@@ -20,7 +20,8 @@ from typing import Any, Callable, Optional
 
 import anyio.to_thread
 import google_auth_core as core
-from mcp.types import ToolAnnotations
+import pydantic_core
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 from . import policy, scope
 
@@ -576,6 +577,26 @@ def _off_loop(fn: Callable) -> Callable:
     return wrapper
 
 
+def _compact_json(fn: Callable) -> Callable:
+    """Async wrapper that sends a dict or list result as one compact JSON text block.
+
+    The MCP library serialises a result with ``indent=2``, which costs 16 to 22%
+    of every result's characters in the model's context. This is the library's
+    own ``pydantic_core.to_json`` call without the indent (installed dependency);
+    a returned ``CallToolResult`` passes through the library unchanged.
+    """
+
+    @functools.wraps(fn)
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        result = await fn(*args, **kwargs)
+        if not isinstance(result, (dict, list)):
+            return result
+        text = pydantic_core.to_json(result, fallback=str).decode()
+        return CallToolResult(content=[TextContent(type="text", text=text)])
+
+    return wrapper
+
+
 # Names of the tools each server declares, by id of the server, whether or
 # not the read-only gate or the toolset registered them.
 declared_tools: dict[int, set[str]] = {}
@@ -630,7 +651,7 @@ def register(
         if drive_scoped:
             inner = _drive_scope(fn, getattr(mcp, "workspace_service", None), mutating)
         mcp.tool(annotations=annotations)(
-            _off_loop(_policy_scope(_retry_scope(inner, retry_safe), mutating))
+            _compact_json(_off_loop(_policy_scope(_retry_scope(inner, retry_safe), mutating)))
         )
         return fn  # direct callers keep the plain sync function
 

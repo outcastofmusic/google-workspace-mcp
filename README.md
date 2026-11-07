@@ -34,7 +34,9 @@ google_workspace_mcp/
 
 Every tool: takes `account`, resolves it, gets a cached per-account client,
 runs the Google call through shared error mapping, and returns
-`{"ok": true, "account": "<resolved>", "data": ...}`.
+`{"ok": true, "account": "<resolved>", "data": ...}` as one line of JSON. Compact JSON
+takes 16% fewer characters than the indented form on short records and 22% fewer on raw
+Google resources.
 
 ### Calendar (`gcal-mcp`)
 
@@ -45,8 +47,8 @@ runs the Google call through shared error mapping, and returns
   has them. `start` and `end` are the `dateTime`, or the `date` of an all-day event. The
   description is plain text cut at 200 characters, the attendees carry their name and
   response, and `video` is the Meet link or another conference's video link. On a
-  recorded work day, 15 events came to 5,508 characters, against 21,412 for Google's raw
-  resource. `get_event` returns the whole event, `htmlLink` and `conferenceData` included.
+  recorded work day, 15 events came to 4,635 characters, against 21,412 for Google's raw
+  resource indented. `get_event` returns the whole event, `htmlLink` and `conferenceData` included.
 
 ### Docs (`gdocs-mcp`)
 

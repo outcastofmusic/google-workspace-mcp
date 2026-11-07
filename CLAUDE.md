@@ -75,6 +75,8 @@ Key invariants, all enforced by `core/runtime.py` — do not bypass them:
 - **Never build a service client directly in a tool.** Always go through `_api(account)` → `get_api`, which caches one client per `(service, resolved_account)`. This is what guarantees the headline feature: parallel accounts never interfere. A new client type is constructed once and reused for the life of the server.
 - **Wrap the actual Google call in `run_tool(lambda: ...)`** so failures become the shared `GoogleCoreError` taxonomy (missing/expired creds produce actionable `Run: google-auth login <account>` messages).
 - **Return via `ok(resolved, data)`** — return the *resolved* account, not the raw `account` arg.
+  `register`'s `_compact_json` wrapper sends the dict to the client as one line of JSON, without
+  the library's two-space indent; a direct Python call still gets the dict.
 
 ## The read-only gate and destructive markers
 
