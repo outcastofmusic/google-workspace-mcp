@@ -139,6 +139,32 @@ def project_message_text(message):
     }
 
 
+def project_message_record(message):
+    """A message as the search tools return it: get_message's keys, without the body.
+
+    Gmail's metadata resource carries every header (34 on a typical message:
+    Received, DKIM, ARC), about 7,500 characters; ten of them overflowed a
+    client's 50,000-character result cap.
+    """
+    headers = (message.get("payload") or {}).get("headers")
+    record = {
+        "id": message.get("id"),
+        "threadId": message.get("threadId"),
+        "labelIds": message.get("labelIds") or [],
+        "subject": _header_value(headers, "Subject"),
+        "from": _header_value(headers, "From"),
+        "to": _header_value(headers, "To"),
+        "date": _header_value(headers, "Date"),
+        "snippet": message.get("snippet") or "",
+    }
+    cc = _header_value(headers, "Cc")
+    if cc:
+        record["cc"] = cc
+    if "account" in message:
+        record["account"] = message["account"]
+    return record
+
+
 def address_header(value):
     """Render To/Cc so only display names get RFC 2047 encoded.
 

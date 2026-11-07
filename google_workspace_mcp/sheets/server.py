@@ -59,7 +59,7 @@ def _cap_rows(value_range: dict, max_chars: int | None) -> bool:
 def read_range(account: str | None = None, *, spreadsheet_id: str, range: str, value_render_option: str = "FORMATTED_VALUE", max_chars: int | None = None) -> dict:
     """Read cell values from a range (A1 notation, e.g. 'Sheet1!A1:C10').
 
-    Rows are capped at max_chars of JSON (default 100000). When truncated=true,
+    Rows are capped at max_chars of JSON (default 40000). When truncated=true,
     next_offset is the number of rows returned; read the rest with a narrower range.
     """
     api, resolved = _api(account)
@@ -73,7 +73,7 @@ def read_range(account: str | None = None, *, spreadsheet_id: str, range: str, v
 def batch_read(account: str | None = None, *, spreadsheet_id: str, ranges: list[str], value_render_option: str = "FORMATTED_VALUE", max_chars: int | None = None) -> dict:
     """Read cell values from multiple ranges in one request (A1 notation).
 
-    All ranges share one max_chars budget of JSON (default 100000). Any range
+    All ranges share one max_chars budget of JSON (default 40000). Any range
     cut short is marked truncated=true with total_rows and next_offset (rows
     returned); read the rest with narrower ranges.
     """

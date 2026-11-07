@@ -49,6 +49,23 @@ Google resources.
   response, and `video` is the Meet link or another conference's video link. On a
   recorded work day, 15 events came to 4,635 characters, against 21,412 for Google's raw
   resource indented. `get_event` returns the whole event, `htmlLink` and `conferenceData` included.
+- **Your calendar's time zone** — `find_available_slots`, `create_event`,
+  `create_out_of_office` and `create_focus_time` read a time without an offset, and working
+  hours, in the account's Calendar time zone unless you pass `timezone`. The setting is read
+  once per account; UTC applies only when Google refuses the read. Slots come back in that
+  zone, e.g. `2026-01-05T09:00:00+02:00` for Europe/Athens.
+
+### Gmail (`gmail-mcp`)
+
+- **Short message records** — `search_messages` and `search_messages_all_accounts` return
+  each message as `id`, `threadId`, `labelIds`, `subject`, `from`, `to`, `date` and
+  `snippet`, plus `cc` when present, the same keys `get_message` uses. A 7-day search of
+  10 messages came to 5,278 characters, against 77,699 for Gmail's metadata resources with
+  their 322 headers. `get_message` and `get_thread` return the body.
+- **Pages of 40,000 characters** — `get_message`, `get_thread`, `read_file_text`, the Docs
+  and Sheets readers and `read_files` return at most 40,000 characters of text by default,
+  marked `truncated` with a `next_offset`. The paging keys then survive a client that cuts
+  a result at 50,000 characters. Pass `max_chars` for a bigger page.
 
 ### Docs (`gdocs-mcp`)
 
@@ -83,7 +100,7 @@ Google resources.
 ### Drive (`gdrive-mcp`)
 
 - **Document text inline**: `read_file_text` returns the text of plain-text files, PDF, Word (docx), PowerPoint (pptx) and Excel (xlsx) files, and native Docs, Sheets and Slides, without saving anything to disk. Pages, slides and sheets are marked `[page 3]`, `[slide 3]` and `[sheet Budget]`; speaker notes follow their slide; spreadsheet rows are tab-separated and every sheet is included. `pages="3-7"` (or `"1,4,9-10"`) reads part of a PDF or presentation, and the result reports `total` and `selected`. Long text pages with `max_chars`/`offset`. Documents are read up to 25 MiB and plain-text files up to 1 MiB; anything larger, and images, need `download_file`. Scanned PDFs have no text layer: their pages come back marked, with a note.
-- **Several files at once**: `read_files(file_ids=[...])` reads each file as above, cuts each at `max_chars_per_file` (default 100,000) and stops at `max_chars_total` (default 400,000), listing the rest under `skipped` and failures under `errors`.
+- **Several files at once**: `read_files(file_ids=[...])` reads each file as above, cuts each at `max_chars_per_file` (default 40,000) and stops at `max_chars_total` (default 40,000), listing the rest under `skipped` and failures under `errors`.
 - **Folder trees**: `list_folder_tree(folder_id=...)` lists every file under a folder and its subfolders, with `path`, `modifiedTime`, `md5Checksum` and `webViewLink`, up to `max_files` (default 500) and `max_depth` (default 10).
 - **Untrusted files**: Office XML that declares a DOCTYPE is refused, an Office file may expand to at most 200 MiB, and password-protected PDFs fail with an error that says so.
 

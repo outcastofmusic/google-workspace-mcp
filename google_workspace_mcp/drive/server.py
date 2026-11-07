@@ -5,7 +5,7 @@ import functools
 
 import google_auth_core as core
 
-from ..core import build_server, cap_text, get_api, ok, run_tool
+from ..core import DEFAULT_MAX_CHARS, build_server, cap_text, get_api, ok, run_tool
 from ..core import register as _register
 from ..core.fanout import fan_out, merged, tag
 from ..core.paths import safe_path
@@ -194,7 +194,7 @@ def read_file_text(
     PDF pages, slides and sheets are marked ([page 3], [slide 3], [sheet Name]).
     pages limits PDFs and presentations to a range such as "3-7" or "1,4,9-10";
     the result reports `total` pages and the `selected` ones. Returns up to
-    max_chars characters (default 100000) from offset; when more remains the
+    max_chars characters (default 40000) from offset; when more remains the
     envelope has truncated=true and next_offset. Documents up to 25 MiB and
     plain-text files up to 1 MiB; larger files need download_file.
     """
@@ -213,8 +213,8 @@ def read_files(
     account: str | None = None,
     *,
     file_ids: list[str],
-    max_chars_per_file: int = 100_000,
-    max_chars_total: int = 400_000,
+    max_chars_per_file: int = DEFAULT_MAX_CHARS,
+    max_chars_total: int = DEFAULT_MAX_CHARS,
 ) -> dict:
     """Read the text of several files in one call (same formats as read_file_text).
 

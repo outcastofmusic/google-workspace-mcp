@@ -19,7 +19,7 @@ from ..core import (
 )
 from ..core.fanout import fan_out, merged, tag
 from ..core.paths import free_path, safe_dir, safe_path, safe_paths
-from .changes_api import GmailChangesAPI
+from .changes_api import GmailChangesAPI, project_message_record
 
 mcp = build_server(
     "gmail-mcp",
@@ -72,12 +72,12 @@ def search_messages(
     query: str | None = None,
     label_ids: list[str] | None = None,
     max_results: int = 10,
-    format: str = "metadata",
     page_token: str | None = None,
 ) -> dict:
-    """Search messages and return full details (headers, snippet, labels) in one call.
+    """Search messages; each is a short record (subject, from, to, cc, date, snippet, labels).
 
-    Pass page_token from a previous response's next_page_token to continue.
+    get_message returns a message's body. Pass page_token from a previous
+    response's next_page_token to continue.
     """
     api, resolved = _api(account)
     page = run_tool(
@@ -85,11 +85,12 @@ def search_messages(
             max_results=max_results,
             label_ids=label_ids,
             query=query,
-            format=format,
+            format="metadata",
             page_token=page_token,
         )
     )
-    return ok(resolved, page["items"], next_page_token=page.get("nextPageToken"))
+    records = [project_message_record(m) for m in page["items"]]
+    return ok(resolved, records, next_page_token=page.get("nextPageToken"))
 
 
 
@@ -99,11 +100,11 @@ def search_messages_all_accounts(
     *,
     query: str,
     max_results_per_account: int = 10,
-    format: str = "metadata",
 ) -> dict:
     """Search messages in every configured account (or only `accounts`) and merge them, newest first.
 
-    Each item carries an `account` key. An account that fails is listed under
+    Each message is a short record, as search_messages returns, with an `account`
+    key; get_message returns a message's body. An account that fails is listed under
     `errors`; the others still return. Use search_messages to page one account.
     """
     results, errors = fan_out(
@@ -112,12 +113,12 @@ def search_messages_all_accounts(
         accounts,
         lambda api: api.search_with_details(
             max_results=max_results_per_account, label_ids=None, query=query,
-            format=format, page_token=None,
+            format="metadata", page_token=None,
         ),
     )
     items = [m for acct, page in results.items() for m in tag(acct, page["items"])]
     items.sort(key=lambda m: int(m.get("internalDate") or 0), reverse=True)
-    return merged(items, results, errors)
+    return merged([project_message_record(m) for m in items], results, errors)
 
 _ATTACHMENT_HINT = "Inline attachment data was dropped to fit max_chars; fetch files with download_attachment."
 
@@ -150,7 +151,7 @@ def get_message(
     """Get a specific message by ID.
 
     format: text (default, readable body), full (raw MIME), metadata, minimal, or raw. Use text unless you need MIME parts.
-    Output is capped at max_chars (default 100000): for text the body and for raw
+    Output is capped at max_chars (default 40000): for text the body and for raw
     the base64 string page via offset/next_offset when truncated=true; for full,
     inline attachment data is dropped (content_trimmed=true; use download_attachment).
     """
@@ -205,7 +206,7 @@ def get_thread(
     """Get a whole conversation (all messages in the thread) by ID in one call.
 
     format: text (default, readable bodies), full (raw MIME), metadata, or minimal. Use text unless you need MIME parts.
-    Output is capped at max_chars (default 100000). Long threads return whole
+    Output is capped at max_chars (default 40000). Long threads return whole
     messages from offset; when truncated=true, call again with offset=next_offset
     (a message index). A single oversized body is cut (body_truncated=true; page
     it with get_message), and format=full drops inline attachment data; either

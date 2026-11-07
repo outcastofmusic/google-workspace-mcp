@@ -687,3 +687,67 @@ async def test_get_thread_full_drops_attachment_data_when_too_big(monkeypatch):
     assert "data" not in data["data"]["messages"][0]["payload"]["parts"][1]["body"]
     assert data["content_trimmed"] is True and "truncated" not in data
     assert "download_attachment" in data["hint"] and "next_offset" not in data["hint"]
+
+
+# ---------------------------------------------------------------------------
+# Short message records from search (agent-ready-defaults)
+# ---------------------------------------------------------------------------
+
+from pathlib import Path  # noqa: E402
+
+from google_workspace_mcp.gmail.changes_api import project_message_record  # noqa: E402
+
+RAW_MESSAGE = {
+    "id": "m1", "threadId": "t1", "labelIds": ["INBOX", "UNREAD"], "snippet": "See you then",
+    "sizeEstimate": 19969, "historyId": "301091", "internalDate": "1793979591000",
+    "payload": {"mimeType": "multipart/alternative", "headers": [
+        {"name": "Received", "value": "by 2002:a05 with SMTP id " + "x" * 300},
+        {"name": "Subject", "value": "Hi"},
+        {"name": "From", "value": "A <a@x.org>"},
+        {"name": "To", "value": "b@x.org"},
+        {"name": "Date", "value": "Fri, 06 Nov 2026 07:39:51 -0800"},
+        {"name": "DKIM-Signature", "value": "v=1; " + "y" * 400},
+    ]},
+}
+
+
+def test_message_record_keys():
+    assert project_message_record(RAW_MESSAGE) == {
+        "id": "m1", "threadId": "t1", "labelIds": ["INBOX", "UNREAD"], "subject": "Hi",
+        "from": "A <a@x.org>", "to": "b@x.org", "date": "Fri, 06 Nov 2026 07:39:51 -0800",
+        "snippet": "See you then",
+    }
+
+
+def test_message_record_cc_only_when_present():
+    with_cc = {**RAW_MESSAGE, "payload": {"headers": [{"name": "cc", "value": "c@x.org"}]}}
+    assert project_message_record(with_cc)["cc"] == "c@x.org"
+    assert "cc" not in project_message_record(RAW_MESSAGE)
+
+
+@pytest.mark.anyio
+async def test_search_messages_returns_records(monkeypatch):
+    fake, patched = make_fake_api()
+    fake.search_with_details = lambda **kw: (fake._record("search_with_details", **kw),
+                                             {"items": [RAW_MESSAGE], "nextPageToken": "p2"})[1]
+    monkeypatch.setattr(server, "_api", patched)
+    data = parse_result(await server.mcp.call_tool("search_messages", {"query": "from:a"}))
+    assert data["data"] == [project_message_record(RAW_MESSAGE)]
+    assert data["next_page_token"] == "p2"
+    assert fake.calls["search_with_details"]["format"] == "metadata"
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    for name in ("search_messages", "search_messages_all_accounts"):
+        assert "format" not in tools[name].input_schema["properties"], name
+        assert "get_message" in tools[name].description, name
+
+
+@pytest.mark.anyio
+async def test_recorded_search_fits(monkeypatch):
+    # The 10 messages a 7-day search returned on 2026-11-07, 322 headers in all, with every
+    # header value, snippet and id replaced; raw, the result held 77,699 characters.
+    raw = json.loads((Path(__file__).parent / "fixtures" / "mail_search.json").read_text())
+    fake, patched = make_fake_api()
+    fake.search_with_details = lambda **kw: {"items": raw}
+    monkeypatch.setattr(server, "_api", patched)
+    text = (await server.mcp.call_tool("search_messages", {"query": "newer_than:7d"})).content[0].text
+    assert len(text) <= 8000, len(text)

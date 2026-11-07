@@ -271,8 +271,9 @@ def test_cap_text_truncates_and_pages():
 
 
 def test_cap_text_default_limit():
-    chunk, meta = cap_text("x" * 100_001)
-    assert len(chunk) == 100_000 and meta["next_offset"] == 100_000
+    # 40,000 keeps next_offset inside a client's 50,000-character cut (agent-ready-defaults).
+    chunk, meta = cap_text("x" * 60_000)
+    assert len(chunk) == 40_000 and meta["next_offset"] == 40_000
 
 
 @pytest.mark.parametrize("kwargs", [{"max_chars": 0}, {"offset": -1}])

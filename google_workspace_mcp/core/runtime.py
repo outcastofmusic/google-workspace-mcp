@@ -72,10 +72,11 @@ _retry_safe: ContextVar[bool] = ContextVar("retry_safe", default=False)
 # Set by the ``register`` wrapper: True while a mutating tool runs, so
 # ``get_api`` applies the account policy (see ``policy.check_account``).
 _mutating: ContextVar[bool] = ContextVar("mutating", default=False)
-# Default cap on what a read tool returns inline, roughly 25k tokens. Bigger
+# Default cap on what a read tool returns inline, roughly 10k tokens. Bigger
 # results waste the agent's context or get cut off by the client with no hint
-# on how to fetch the rest.
-DEFAULT_MAX_CHARS = 100_000
+# on how to fetch the rest: a client that cuts at 50,000 characters drops the
+# end of the JSON, where next_offset sits (change agent-ready-defaults).
+DEFAULT_MAX_CHARS = 40_000
 
 
 def ok(account: str, data: Any, **meta: Any) -> dict:
