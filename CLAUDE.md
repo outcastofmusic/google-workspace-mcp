@@ -33,9 +33,11 @@ google_workspace_mcp/
              common_tools (list_accounts / whoami / auth_status),
              scope (client scope from _meta: accounts, Drive folders)
   gmail/     server.py + changes_api.GmailChangesAPI (subclass)  -> gmail-mcp
+             the search tools return project_message_record short records
   calendar/  server.py + changes_api.CalendarChangesAPI        -> gcal-mcp
              the list tools return _event_record short records; get_event
-               the whole event
+               the whole event; _zone gives the zone-taking tools the account's
+               Calendar time zone when the caller passes none
              + busy_sync.py: the busy-block marker bj shares (MARKER
                "gwmcp_block", KEY "gwmcp_key"; keep both names) and the retired
                gcal-busy-sync, which refuses and exits 2. bj is the only writer of

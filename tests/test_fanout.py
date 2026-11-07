@@ -24,7 +24,9 @@ class FakeGmail:
         if self.account == "me@broken.com":
             raise core.InvalidArgumentError("boom")
         date = {"me@work.com": "2000", "me@home.com": "3000"}[self.account]
-        return {"items": [{"id": f"m-{self.account}", "internalDate": date, "q": query}]}
+        # The query comes back in the snippet, so a test can see it reached each account.
+        return {"items": [{"id": f"m-{self.account}", "internalDate": date, "snippet": query,
+                           "payload": {"headers": [{"name": "Received", "value": "x" * 500}]}}]}
 
 
 class FakeCalendar:
@@ -60,7 +62,9 @@ def test_gmail_search_merges_every_account_newest_first(two_accounts, monkeypatc
         ("m-me@home.com", "me@home.com"),
         ("m-me@work.com", "me@work.com"),
     ]
-    assert all(m["q"] == "invoice" for m in env["data"])
+    assert all(m["snippet"] == "invoice" for m in env["data"])
+    # Short records (agent-ready-defaults): no raw headers or Gmail bookkeeping.
+    assert all("payload" not in m and "internalDate" not in m for m in env["data"])
     assert "errors" not in env
 
 

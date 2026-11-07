@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime
 import re
 from html.parser import HTMLParser
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..contacts.tools import register_contacts_tools
 from ..core import build_server, get_api, ok, register, run_tool
@@ -101,6 +102,28 @@ def _event_record(event: dict) -> dict:
 
 def _records(events: list) -> list:
     return [_event_record(e) for e in events]
+
+
+# Time zone of each account's calendar, read once per process (change agent-ready-defaults).
+# A UTC default put slots and naive start times two hours off for a person in Athens.
+_ZONES: dict[str, str] = {}
+
+
+def _tzinfo(name: str) -> datetime.tzinfo:
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.timezone.utc  # the library's own fallback for an unknown zone
+
+
+def _zone(api, account: str, timezone: str | None) -> str:
+    """The caller's zone, else the account's Calendar setting, else UTC."""
+    if timezone:
+        return timezone
+    if account not in _ZONES:
+        # get_user_settings returns {} when Google refuses the read.
+        _ZONES[account] = run_tool(api.get_user_settings).get("timezone") or "UTC"
+    return _ZONES[account]
 
 
 # ---------------------------------------------------------------------------
@@ -305,12 +328,16 @@ def find_available_slots(
     working_hours_start: int = 9,
     working_hours_end: int = 18,
     exclude_weekends: bool = True,
-    timezone: str = "UTC",
+    timezone: str | None = None,
 ) -> dict:
-    """Find available meeting slots when all attendees are free (RFC3339 time_min/time_max)."""
+    """Find available meeting slots when all attendees are free (RFC3339 time_min/time_max).
+
+    Working hours are in `timezone`, by default the calendar's own time zone.
+    """
     from datetime import datetime
 
     api, resolved = _api(account)
+    timezone = _zone(api, resolved, timezone)
     emails = attendee_emails or []
 
     def _call():
@@ -327,8 +354,10 @@ def find_available_slots(
             exclude_weekends=exclude_weekends,
             timezone=timezone,
         )
-        # Serialize datetime tuples to ISO strings for JSON transport
-        return [{"start": s.isoformat(), "end": e.isoformat()} for s, e in slots]
+        # The library returns UTC; report each slot in the zone its working hours used.
+        local = _tzinfo(timezone)
+        return [{"start": s.astimezone(local).isoformat(), "end": e.astimezone(local).isoformat()}
+                for s, e in slots]
 
     data = run_tool(_call)
     return ok(resolved, data)
@@ -383,12 +412,17 @@ def create_event(
     calendar_id: str = "primary",
     attendees: list[str] | None = None,
     recurrence: list[str] | None = None,
-    timezone: str = "UTC",
+    timezone: str | None = None,
     color_id: str | None = None,
     add_meet: bool = False,
 ) -> dict:
-    """Create a new calendar event."""
+    """Create a new calendar event.
+
+    A start or end time without an offset is in `timezone`, by default the
+    calendar's own time zone.
+    """
     api, resolved = _api(account)
+    timezone = _zone(api, resolved, timezone)
     data = run_tool(
         lambda: api.create_event(
             summary=summary,
@@ -413,14 +447,18 @@ def create_out_of_office(
     *,
     start_time: str,
     end_time: str,
-    timezone: str = "UTC",
+    timezone: str | None = None,
     calendar_id: str = "primary",
     summary: str | None = None,
     decline_message: str | None = None,
     auto_decline: bool = True,
 ) -> dict:
-    """Create an out-of-office block on the primary calendar. Declines conflicting invites when auto_decline=True (default)."""
+    """Create an out-of-office block on the primary calendar. Declines conflicting invites when auto_decline=True (default).
+
+    Times without an offset are in `timezone`, by default the calendar's own time zone.
+    """
     api, resolved = _api(account)
+    timezone = _zone(api, resolved, timezone)
     data = run_tool(
         lambda: api.create_status_event(
             event_type="outOfOffice",
@@ -442,14 +480,18 @@ def create_focus_time(
     *,
     start_time: str,
     end_time: str,
-    timezone: str = "UTC",
+    timezone: str | None = None,
     calendar_id: str = "primary",
     summary: str | None = None,
     decline_message: str | None = None,
     auto_decline: bool = True,
 ) -> dict:
-    """Create a focus-time block on the primary calendar. Declines conflicting invites when auto_decline=True (default)."""
+    """Create a focus-time block on the primary calendar. Declines conflicting invites when auto_decline=True (default).
+
+    Times without an offset are in `timezone`, by default the calendar's own time zone.
+    """
     api, resolved = _api(account)
+    timezone = _zone(api, resolved, timezone)
     data = run_tool(
         lambda: api.create_status_event(
             event_type="focusTime",

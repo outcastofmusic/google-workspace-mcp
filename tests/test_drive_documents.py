@@ -293,3 +293,14 @@ async def test_list_folder_tree_tool(fake):
     ))
     fake.list_folder_tree.assert_called_once_with("P", max_files=50, max_depth=10)
     assert env["ok"] and env["account"] == "d@x.com"
+
+
+@pytest.mark.anyio
+async def test_default_page_is_40000(fake):
+    # agent-ready-defaults: the paging keys must survive a client's 50,000-character cut.
+    fake.read_file_text.return_value = {"fileId": "F", "text": "x" * 60_000}
+    result = await server.mcp.call_tool("read_file_text", {"file_id": "F"})
+    text = result.content[0].text
+    env = json.loads(text)
+    assert len(env["data"]["text"]) == 40_000 and env["truncated"] and env["next_offset"] == 40_000
+    assert len(text) < 50_000

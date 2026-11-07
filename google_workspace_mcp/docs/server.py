@@ -40,7 +40,7 @@ def get_document(
     """Get a document's raw Docs API JSON (title, body content, styles). Large and verbose.
 
     To read a doc prefer read_document_as_markdown; to find indices for edits
-    prefer get_content_map. Body content is capped at max_chars (default 100000)
+    prefer get_content_map. Body content is capped at max_chars (default 40000)
     of JSON; when truncated=true, call again with offset=next_offset (a body
     element index) for the next elements.
     """
@@ -67,7 +67,7 @@ def read_document(
 ) -> dict:
     """Read a document's plain text (paragraphs and table cells).
 
-    Returns up to max_chars characters (default 100000) from offset; when
+    Returns up to max_chars characters (default 40000) from offset; when
     truncated=true, call again with offset=next_offset.
     """
     api, resolved = _api(account)
@@ -89,7 +89,7 @@ def read_document_as_markdown(
 ) -> dict:
     """Read a document as markdown, preserving headings, lists, tables, and links (unlike read_document's plain text).
 
-    Returns up to max_chars characters (default 100000) from offset; when
+    Returns up to max_chars characters (default 40000) from offset; when
     truncated=true, call again with offset=next_offset.
     """
     api, resolved = _api(account)

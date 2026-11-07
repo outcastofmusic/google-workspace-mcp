@@ -20,7 +20,9 @@ def anyio_backend():
 def fake_api(monkeypatch):
     """Monkeypatch _api so no real auth or network calls occur."""
     fake = MagicMock(spec=CalendarChangesAPI)
+    fake.get_user_settings.return_value = {}
     monkeypatch.setattr(server, "_api", lambda account=None: (fake, "test@x.com"))
+    monkeypatch.setattr(server, "_ZONES", {})
     return fake
 
 
@@ -523,3 +525,55 @@ async def test_recorded_day_compact(fake_api):
     fake_api.list_events_page.return_value = {"items": raw}
     text = (await server.mcp.call_tool("list_events", {"max_results": 50})).content[0].text
     assert "\n" not in text and len(text) <= 4700, len(text)
+
+
+# ---------------------------------------------------------------------------
+# The calendar's own time zone by default (agent-ready-defaults)
+# ---------------------------------------------------------------------------
+
+def _real_api(zone_items, busy=()):
+    """A real CalendarChangesAPI over a fake Google service, so the library's slot logic runs."""
+    api = CalendarChangesAPI.__new__(CalendarChangesAPI)
+    service = MagicMock()
+    service.settings().list().execute.return_value = {"items": zone_items}
+    service.freebusy().query().execute.return_value = {"calendars": {"primary": {"busy": list(busy)}}}
+    api.service = service
+    return api
+
+
+@pytest.mark.anyio
+async def test_slots_default_to_calendar_zone(monkeypatch):
+    api = _real_api([{"id": "timezone", "value": '"Europe/Athens"'}])
+    monkeypatch.setattr(server, "_api", lambda account=None: (api, "test@x.com"))
+    data = _parse(await server.mcp.call_tool("find_available_slots", {
+        "time_min": "2026-01-05T00:00:00+02:00", "time_max": "2026-01-05T23:59:00+02:00"}))
+    assert data["data"][0]["start"].startswith("2026-01-05T09:00:00+02:00"), data["data"][0]
+
+
+@pytest.mark.anyio
+async def test_zone_falls_back_to_utc(monkeypatch):
+    api = _real_api([])
+    monkeypatch.setattr(server, "_api", lambda account=None: (api, "test@x.com"))
+    data = _parse(await server.mcp.call_tool("find_available_slots", {
+        "time_min": "2026-01-05T00:00:00Z", "time_max": "2026-01-05T23:59:00Z"}))
+    assert data["data"][0]["start"].startswith("2026-01-05T09:00:00+00:00"), data["data"][0]
+
+
+@pytest.mark.anyio
+async def test_create_event_defaults_to_calendar_zone(fake_api):
+    fake_api.get_user_settings.return_value = {"timezone": "Europe/Athens"}
+    fake_api.create_event.return_value = {"id": "e1"}
+    await server.mcp.call_tool("create_event", {"summary": "Dentist", "start_time": "2026-11-10T10:00:00"})
+    await server.mcp.call_tool("create_focus_time", {"start_time": "2026-11-10T08:00:00", "end_time": "2026-11-10T09:00:00"})
+    assert fake_api.create_event.call_args.kwargs["timezone"] == "Europe/Athens"
+    assert fake_api.create_status_event.call_args.kwargs["timezone"] == "Europe/Athens"
+    assert fake_api.get_user_settings.call_count == 1  # read once per account
+
+
+@pytest.mark.anyio
+async def test_explicit_zone_wins(fake_api):
+    fake_api.create_event.return_value = {"id": "e1"}
+    await server.mcp.call_tool("create_event", {"summary": "Call", "start_time": "2026-11-10T10:00:00",
+                                                "timezone": "America/New_York"})
+    assert fake_api.create_event.call_args.kwargs["timezone"] == "America/New_York"
+    fake_api.get_user_settings.assert_not_called()
