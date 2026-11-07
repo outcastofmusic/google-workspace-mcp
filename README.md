@@ -36,6 +36,18 @@ Every tool: takes `account`, resolves it, gets a cached per-account client,
 runs the Google call through shared error mapping, and returns
 `{"ok": true, "account": "<resolved>", "data": ...}`.
 
+### Calendar (`gcal-mcp`)
+
+- **Short event records** — `list_events`, `search_events`,
+  `get_recurring_event_instances` and `list_events_all_accounts` return each event as
+  `id`, `summary`, `start` and `end`, plus `status`, `location`, `description`,
+  `attendees`, `organizer`, `video`, `recurring_event_id` and `event_type` when the event
+  has them. `start` and `end` are the `dateTime`, or the `date` of an all-day event. The
+  description is plain text cut at 200 characters, the attendees carry their name and
+  response, and `video` is the Meet link or another conference's video link. On a
+  recorded work day, 15 events came to 5,508 characters, against 21,412 for Google's raw
+  resource. `get_event` returns the whole event, `htmlLink` and `conferenceData` included.
+
 ### Docs (`gdocs-mcp`)
 
 - **Markdown in/out** — `create_document_from_markdown`, `append_markdown`, and

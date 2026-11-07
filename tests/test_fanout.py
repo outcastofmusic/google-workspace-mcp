@@ -96,6 +96,9 @@ def test_calendar_agenda_sorted_by_instant_across_accounts(two_accounts, monkeyp
     # h1 all-day 00:00Z, w1 07:00Z, h2 07:30Z, w2 12:00Z
     assert [e["id"] for e in env["data"]] == ["h1", "w1", "h2", "w2"]
     assert {e["id"]: e["account"] for e in env["data"]}["w1"] == "me@work.com"
+    # Short records (compact-calendar-events): start as a string, the account kept.
+    assert all(set(e) <= {"id", "summary", "start", "end", "account"} for e in env["data"])
+    assert isinstance(env["data"][0]["start"], str)
 
 
 def test_drive_search_merges_newest_first(two_accounts, monkeypatch):

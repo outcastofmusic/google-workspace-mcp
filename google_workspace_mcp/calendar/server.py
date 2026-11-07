@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import datetime
+import re
+from html.parser import HTMLParser
 
 from ..contacts.tools import register_contacts_tools
 from ..core import build_server, get_api, ok, register, run_tool
@@ -18,6 +20,87 @@ register_contacts_tools(mcp, service_name="calendar")
 
 def _api(account=None):
     return get_api("calendar", CalendarChangesAPI, account)
+
+
+# ---------------------------------------------------------------------------
+# Short event records (change compact-calendar-events)
+# ---------------------------------------------------------------------------
+
+# The list tools return what an agent reads from an event. Google's raw
+# resource runs 1 to 4 KB per event (etag, htmlLink, iCalUID, creator,
+# conferenceData, HTML descriptions), and a week of it overflowed a client's
+# 50,000-character result cap. get_event still returns the whole resource.
+DESCRIPTION_CHARS = 200
+
+
+class _Text(HTMLParser):
+    """Collects an HTML description's text; convert_charrefs decodes entities (stdlib)."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        self.parts.append(" ")
+
+
+def _plain(text: str) -> str:
+    parser = _Text()
+    parser.feed(text)
+    parser.close()
+    return re.sub(r"\s+", " ", "".join(parser.parts)).strip()
+
+
+def _when(t: dict | None) -> str | None:
+    t = t or {}
+    return t.get("dateTime") or t.get("date")
+
+
+def _video(event: dict) -> str | None:
+    if event.get("hangoutLink"):
+        return event["hangoutLink"]
+    points = (event.get("conferenceData") or {}).get("entryPoints") or []
+    return next((p["uri"] for p in points if p.get("entryPointType") == "video" and p.get("uri")), None)
+
+
+def _event_record(event: dict) -> dict:
+    """An event as the list tools return it: the keys an agent reads, present ones only."""
+    rec = {"id": event.get("id"), "summary": event.get("summary", ""),
+           "start": _when(event.get("start")), "end": _when(event.get("end"))}
+    if event.get("status", "confirmed") != "confirmed":
+        rec["status"] = event["status"]
+    if event.get("location"):
+        rec["location"] = event["location"]
+    text = _plain(event.get("description") or "")
+    if text:
+        rec["description"] = text if len(text) <= DESCRIPTION_CHARS else text[:DESCRIPTION_CHARS] + "…"
+    if event.get("attendees"):
+        rec["attendees"] = [
+            {"email": a.get("email"), "response": a.get("responseStatus"),
+             **({"name": a["displayName"]} if a.get("displayName") else {})}
+            for a in event["attendees"]
+        ]
+    organizer = event.get("organizer") or {}
+    if organizer.get("email") and not organizer.get("self"):
+        rec["organizer"] = organizer["email"]
+    video = _video(event)
+    if video:
+        rec["video"] = video
+    if event.get("recurringEventId"):
+        rec["recurring_event_id"] = event["recurringEventId"]
+    if event.get("eventType", "default") != "default":
+        rec["event_type"] = event["eventType"]
+    # list_events_all_accounts tags each event with its account (fanout.tag).
+    if "account" in event:
+        rec["account"] = event["account"]
+    return rec
+
+
+def _records(events: list) -> list:
+    return [_event_record(e) for e in events]
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +150,7 @@ def list_events(
 ) -> dict:
     """List events on a calendar within an optional time window (RFC3339 timestamps).
 
+    Each event is a short record; get_event returns the whole event.
     Pass page_token from a previous response's next_page_token to continue.
     """
     api, resolved = _api(account)
@@ -81,7 +165,7 @@ def list_events(
             page_token=page_token,
         )
     )
-    return ok(resolved, page["items"], next_page_token=page.get("nextPageToken"))
+    return ok(resolved, _records(page["items"]), next_page_token=page.get("nextPageToken"))
 
 
 
@@ -110,8 +194,9 @@ def list_events_all_accounts(
 ) -> dict:
     """List events from every account's primary calendar (or only `accounts`) as one agenda.
 
-    time_min/time_max are RFC3339. Events are sorted by start time and each
-    carries an `account` key. An account that fails is listed under `errors`.
+    time_min/time_max are RFC3339. Events are short records sorted by start
+    time, each with an `account` key; get_event returns the whole event. An
+    account that fails is listed under `errors`.
     """
     results, errors = fan_out(
         "calendar",
@@ -125,7 +210,7 @@ def list_events_all_accounts(
     )
     items = [e for acct, page in results.items() for e in tag(acct, page["items"])]
     items.sort(key=_start_key)
-    return merged(items, results, errors)
+    return merged(_records(items), results, errors)
 
 
 # sync_busy_blocks was retired on 2026-10-30: bj writes the busy blocks
@@ -143,6 +228,7 @@ def search_events(
 ) -> dict:
     """Search events on a calendar by text query.
 
+    Each event is a short record; get_event returns the whole event.
     Pass page_token from a previous response's next_page_token to continue.
     """
     api, resolved = _api(account)
@@ -151,7 +237,7 @@ def search_events(
             query=query, calendar_id=calendar_id, max_results=max_results, page_token=page_token
         )
     )
-    return ok(resolved, page["items"], next_page_token=page.get("nextPageToken"))
+    return ok(resolved, _records(page["items"]), next_page_token=page.get("nextPageToken"))
 
 
 @register(mcp, core=True)
@@ -178,6 +264,7 @@ def get_recurring_event_instances(
 ) -> dict:
     """Get all instances of a recurring event.
 
+    Each instance is a short record; get_event returns the whole event.
     Pass page_token from a previous response's next_page_token to continue.
     """
     api, resolved = _api(account)
@@ -186,7 +273,7 @@ def get_recurring_event_instances(
             event_id, calendar_id=calendar_id, max_results=max_results, page_token=page_token
         )
     )
-    return ok(resolved, page["items"], next_page_token=page.get("nextPageToken"))
+    return ok(resolved, _records(page["items"]), next_page_token=page.get("nextPageToken"))
 
 
 @register(mcp, core=True)

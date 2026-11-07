@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -76,7 +77,9 @@ async def test_tool_count():
 
 @pytest.mark.anyio
 async def test_list_events_returns_envelope(fake_api):
-    fake_api.list_events_page.return_value = {"items": [{"id": "ev1", "summary": "Standup"}]}
+    fake_api.list_events_page.return_value = {"items": [
+        {"id": "ev1", "summary": "Standup", "etag": '"1"', "htmlLink": "https://x",
+         "start": {"dateTime": "2025-01-06T09:00:00Z"}, "end": {"dateTime": "2025-01-06T09:15:00Z"}}]}
 
     result = await server.mcp.call_tool(
         "list_events",
@@ -86,7 +89,8 @@ async def test_list_events_returns_envelope(fake_api):
 
     assert data["ok"] is True
     assert data["account"] == "test@x.com"
-    assert data["data"] == [{"id": "ev1", "summary": "Standup"}]
+    assert data["data"] == [{"id": "ev1", "summary": "Standup",
+                             "start": "2025-01-06T09:00:00Z", "end": "2025-01-06T09:15:00Z"}]
     assert "next_page_token" not in data
 
 
@@ -275,7 +279,7 @@ async def test_delete_event_docstring_has_destructive_marker():
 
 @pytest.mark.anyio
 async def test_search_events(fake_api):
-    fake_api.search_events_page.return_value = {"items": [{"id": "s1"}]}
+    fake_api.search_events_page.return_value = {"items": [{"id": "s1", "summary": "Budget", "iCalUID": "u@g"}]}
 
     result = await server.mcp.call_tool(
         "search_events",
@@ -283,7 +287,7 @@ async def test_search_events(fake_api):
     )
     data = _parse(result)
     assert data["ok"] is True
-    assert data["data"] == [{"id": "s1"}]
+    assert data["data"] == [{"id": "s1", "summary": "Budget", "start": None, "end": None}]
     fake_api.search_events_page.assert_called_once_with(
         query="budget", calendar_id="primary", max_results=3, page_token=None
     )
@@ -394,3 +398,119 @@ async def test_delete_calendar(fake_api):
     fake_api.delete_calendar.assert_called_once_with(
         "oldcal@group.calendar.google.com"
     )
+
+
+# ---------------------------------------------------------------------------
+# Short event records (compact-calendar-events)
+# ---------------------------------------------------------------------------
+
+RECORD_KEYS = {"id", "summary", "start", "end", "status", "location", "description", "attendees",
+               "organizer", "video", "recurring_event_id", "event_type"}
+
+FULL_EVENT = {
+    "kind": "calendar#event", "etag": '"3587631703863294"', "id": "ev1", "status": "tentative",
+    "htmlLink": "https://www.google.com/calendar/event?eid=abc", "created": "2025-12-01T09:00:00.000Z",
+    "updated": "2025-12-01T09:00:00.000Z", "summary": "Budget review", "location": "Room 4",
+    "description": "Agenda", "creator": {"email": "boss@example.org"},
+    "organizer": {"email": "boss@example.org", "displayName": "Boss"},
+    "start": {"dateTime": "2026-01-05T10:00:00+02:00", "timeZone": "Europe/Athens"},
+    "end": {"dateTime": "2026-01-05T11:00:00+02:00", "timeZone": "Europe/Athens"},
+    "recurringEventId": "series1", "originalStartTime": {"dateTime": "2026-01-05T10:00:00+02:00"},
+    "iCalUID": "series1@google.com", "sequence": 2, "reminders": {"useDefault": True},
+    "attendees": [{"email": "me@example.org", "self": True, "responseStatus": "accepted"},
+                  {"email": "maria@example.org", "displayName": "Maria", "responseStatus": "needsAction"}],
+    "hangoutLink": "https://meet.google.com/abc-defg-hij",
+    "conferenceData": {"entryPoints": [{"entryPointType": "video", "uri": "https://meet.google.com/abc-defg-hij"}]},
+    "eventType": "focusTime",
+}
+
+
+def test_event_record_keeps_only_listed_keys():
+    rec = server._event_record(FULL_EVENT)
+    assert set(rec) <= RECORD_KEYS
+    assert rec == {
+        "id": "ev1", "summary": "Budget review", "start": "2026-01-05T10:00:00+02:00",
+        "end": "2026-01-05T11:00:00+02:00", "status": "tentative", "location": "Room 4",
+        "description": "Agenda", "organizer": "boss@example.org",
+        "attendees": [{"email": "me@example.org", "response": "accepted"},
+                      {"email": "maria@example.org", "response": "needsAction", "name": "Maria"}],
+        "video": "https://meet.google.com/abc-defg-hij", "recurring_event_id": "series1",
+        "event_type": "focusTime",
+    }
+
+
+def test_event_record_omits_defaults():
+    rec = server._event_record({"id": "e", "summary": "Lunch", "status": "confirmed", "eventType": "default",
+                                "organizer": {"email": "me@example.org", "self": True},
+                                "start": {"dateTime": "2026-01-05T13:00:00Z"}, "end": {"dateTime": "2026-01-05T14:00:00Z"}})
+    assert rec == {"id": "e", "summary": "Lunch", "start": "2026-01-05T13:00:00Z", "end": "2026-01-05T14:00:00Z"}
+
+
+def test_event_record_all_day():
+    rec = server._event_record({"id": "e", "start": {"date": "2026-11-12"}, "end": {"date": "2026-11-13"}})
+    assert (rec["start"], rec["end"]) == ("2026-11-12", "2026-11-13")
+
+
+def test_event_record_cuts_description():
+    rec = server._event_record({"id": "e", "description": "x" * 2000})
+    assert rec["description"] == "x" * 200 + "…"
+    assert server._event_record({"id": "e", "description": "y" * 200})["description"] == "y" * 200
+
+
+def test_event_record_html_description():
+    rec = server._event_record({"id": "e", "description": "<p>Room <b>4</b></p><p>Bring&nbsp;slides</p>"})
+    assert rec["description"] == "Room 4 Bring slides"
+    assert "description" not in server._event_record({"id": "e", "description": "<p></p>"})
+
+
+def test_event_record_video_link():
+    zoom = {"id": "e", "conferenceData": {"entryPoints": [
+        {"entryPointType": "phone", "uri": "tel:+1-555"}, {"entryPointType": "video", "uri": "https://zoom.us/j/1"}]}}
+    assert server._event_record(zoom)["video"] == "https://zoom.us/j/1"
+    assert "video" not in server._event_record({"id": "e"})
+
+
+def test_event_record_attendee_names():
+    rec = server._event_record({"id": "e", "attendees": [{"email": "a@x.org", "displayName": "Ann", "responseStatus": "declined"}]})
+    assert rec["attendees"] == [{"email": "a@x.org", "response": "declined", "name": "Ann"}]
+
+
+@pytest.mark.anyio
+async def test_recorded_day_fits(fake_api):
+    # The 15 events of a work Monday as Google returned them on 2026-11-07, with ids, emails,
+    # links and dates replaced; raw, the tool's result held 21,412 characters.
+    raw = json.loads((Path(__file__).parent / "fixtures" / "calendar_day.json").read_text())
+    assert len(raw) == 15
+    fake_api.list_events_page.return_value = {"items": raw}
+    result = await server.mcp.call_tool("list_events", {"max_results": 50})
+    text = result.content[0].text
+    assert len(text) <= 6000, len(text)
+    assert all(set(r) <= RECORD_KEYS for r in json.loads(text)["data"])
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("tool,method,args", [
+    ("list_events", "list_events_page", {}),
+    ("search_events", "search_events_page", {"query": "x"}),
+    ("get_recurring_event_instances", "instances_page", {"event_id": "series1"}),
+])
+async def test_list_tools_return_records_and_keep_paging(fake_api, tool, method, args):
+    getattr(fake_api, method).return_value = {"items": [FULL_EVENT], "nextPageToken": "tok2"}
+    data = _parse(await server.mcp.call_tool(tool, args))
+    assert data["data"] == [server._event_record(FULL_EVENT)]
+    assert "htmlLink" not in data["data"][0]
+    assert data["next_page_token"] == "tok2"
+
+
+@pytest.mark.anyio
+async def test_get_event_returns_whole_event(fake_api):
+    fake_api.get_event.return_value = FULL_EVENT
+    data = _parse(await server.mcp.call_tool("get_event", {"event_id": "ev1"}))
+    assert data["data"] == FULL_EVENT
+
+
+@pytest.mark.anyio
+async def test_list_tool_descriptions_name_get_event():
+    tools = {t.name: t for t in await server.mcp.list_tools()}
+    for name in ("list_events", "search_events", "get_recurring_event_instances", "list_events_all_accounts"):
+        assert "short record" in tools[name].description and "get_event" in tools[name].description, name
