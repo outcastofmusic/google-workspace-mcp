@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import errno
+import json
 
 import anyio
 import google_auth_core as core
@@ -292,3 +293,70 @@ def test_cap_items_keeps_whole_items_and_pages():
 def test_cap_items_always_returns_one_item():
     kept, meta = cap_items(["x" * 50, "y"], 10)
     assert kept == ["x" * 50] and meta["next_offset"] == 1
+
+
+# --- compact JSON results (compact-tool-json) --------------------------------
+
+def _server_with(fn):
+    from google_workspace_mcp.core.server import build_server
+
+    mcp = build_server("t")
+    register(mcp)(fn)
+    return mcp
+
+
+def _text(mcp, name, args=None):
+    async def go():
+        return await mcp.call_tool(name, args or {})
+
+    return anyio.run(go).content[0].text
+
+
+def test_dict_result_is_compact_json():
+    def nested() -> dict:
+        """A nested result."""
+        return {"ok": True, "data": [{"id": "a", "tags": ["x", "y"]}, {"id": "b"}]}
+
+    text = _text(_server_with(nested), "nested")
+    assert text == '{"ok":true,"data":[{"id":"a","tags":["x","y"]},{"id":"b"}]}'
+
+
+def test_non_ascii_unescaped():
+    def greet() -> dict:
+        """Greek text."""
+        return {"data": "Καλημέρα", "note": "line1\nline2"}
+
+    text = _text(_server_with(greet), "greet")
+    assert "Καλημέρα" in text and "\\u" not in text
+    assert "\n" not in text and json.loads(text)["note"] == "line1\nline2"
+
+
+def test_string_result_unchanged():
+    def plain() -> str:
+        """A string result."""
+        return "hello"
+
+    assert _text(_server_with(plain), "plain") == "hello"
+
+
+def test_direct_call_returns_dict():
+    def direct() -> dict:
+        """Direct."""
+        return {"ok": True}
+
+    assert register(_FakeMCP())(direct)() == {"ok": True}
+
+
+def test_schema_unchanged_by_wrapper():
+    def search(query: str, max_results: int = 10) -> dict:
+        """Search things."""
+        return {"ok": True}
+
+    async def go():
+        return {t.name: t for t in await _server_with(search).list_tools()}["search"]
+
+    tool = anyio.run(go)
+    assert set(tool.input_schema["properties"]) == {"query", "max_results"}
+    assert tool.input_schema["required"] == ["query"]
+    assert tool.output_schema is None and tool.description == "Search things."
+

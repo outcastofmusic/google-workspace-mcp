@@ -514,3 +514,12 @@ async def test_list_tool_descriptions_name_get_event():
     tools = {t.name: t for t in await server.mcp.list_tools()}
     for name in ("list_events", "search_events", "get_recurring_event_instances", "list_events_all_accounts"):
         assert "short record" in tools[name].description and "get_event" in tools[name].description, name
+
+
+@pytest.mark.anyio
+async def test_recorded_day_compact(fake_api):
+    # compact-tool-json: the 15 records of the fixture day, 5,505 characters indented.
+    raw = json.loads((Path(__file__).parent / "fixtures" / "calendar_day.json").read_text())
+    fake_api.list_events_page.return_value = {"items": raw}
+    text = (await server.mcp.call_tool("list_events", {"max_results": 50})).content[0].text
+    assert "\n" not in text and len(text) <= 4700, len(text)

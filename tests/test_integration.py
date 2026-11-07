@@ -619,3 +619,21 @@ def test_combined_names_do_not_depend_on_the_toolset():
         names[toolset] = set(eval(out.stdout))  # noqa: S307 - our own printed list
     assert names["core"] <= names["all"]
     assert "replace_all_text" in names["all"] and "replace_text_in_deck" in names["all"]
+
+
+@pytest.mark.anyio
+async def test_every_server_sends_compact_json(store_env, write_token):
+    """compact-tool-json: a dict result reaches the client as one line of JSON."""
+    from google_workspace_mcp.calendar import server as c
+    from google_workspace_mcp.docs import server as d
+    from google_workspace_mcp.drive import server as dr
+    from google_workspace_mcp.gmail import server as g
+    from google_workspace_mcp.sheets import server as s
+    from google_workspace_mcp.slides import server as sl
+    from google_workspace_mcp.workspace import server as w
+
+    write_token(store_env, "a@x.com")
+    for mod in (g, c, s, d, dr, sl, w):
+        text = (await mod.mcp.call_tool("list_accounts", {})).content[0].text
+        assert "\n" not in text and ": " not in text, mod.__name__
+        assert json.loads(text)["ok"] is True
