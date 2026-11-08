@@ -11,4 +11,5 @@
 - [x] 2.1 README "Read-only mode" and CLAUDE.md's gate section name the flag and the tag.
 - [x] 2.2 Run `ruff check .` and `pytest` with `GOOGLE_MCP_LIVE` unset. Verify: both pass.
   - Done 2026-11-08: ruff clean; 732 passed, 11 skipped after 1.2 and 1.3.
-- [ ] 2.3 Release: bump `pyproject.toml`, `google_workspace_mcp/__version__`, the tag in `.mcp.json` and every `@vX.Y.Z` in the README in one commit; after the PR merges, tag `main`; reinstall with `uv tool install`. Verify: `gmail-mcp` with the flag lists no `send_message`.
+- [x] 2.3 Release: bump `pyproject.toml`, `google_workspace_mcp/__version__`, the tag in `.mcp.json` and every `@vX.Y.Z` in the README in one commit; after the PR merges, tag `main`; reinstall with `uv tool install`. Verify: `gmail-mcp` with the flag lists no `send_message`.
+  - Done 2026-11-08: v0.12.0 tagged on main (045f5ca) and installed from the tag. With the flag, gmail-mcp lists 27 tools with no send_message, and gdrive-mcp lists 27.
