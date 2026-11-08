@@ -571,3 +571,77 @@ def test_change_feed_tools_available_in_readonly_mode(pkg, tool):
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "True"
+
+
+# --- Gmail batch fetch (fix-gmail-batch-concurrency) ---
+
+class _FakeBatch:
+    """Stands in for googleapiclient's BatchHttpRequest; `answer(id)` gives a message or an exception."""
+
+    def __init__(self, answer, sizes):
+        self._answer, self._sizes, self._requests = answer, sizes, []
+
+    def add(self, request, callback, request_id):
+        self._requests.append((callback, request_id))
+
+    def execute(self):
+        self._sizes.append(len(self._requests))
+        for callback, request_id in self._requests:
+            outcome = self._answer(request_id)
+            if isinstance(outcome, Exception):
+                callback(request_id, None, outcome)
+            else:
+                callback(request_id, outcome, None)
+
+
+def _gmail_api_with_batch(monkeypatch, answer):
+    api, svc = _gmail_api_with_mock(monkeypatch)
+    sizes = []
+    svc.new_batch_http_request = lambda: _FakeBatch(answer, sizes)
+    sleeps = []
+    monkeypatch.setattr("google_workspace_mcp.gmail.changes_api.time.sleep", sleeps.append)
+    return api, sizes, sleeps
+
+
+def test_gmail_batch_fetch_splits_into_chunks_of_twenty(monkeypatch):
+    api, sizes, sleeps = _gmail_api_with_batch(monkeypatch, lambda i: {"id": i})
+    ids = [f"m{n}" for n in range(50)]
+    out = api.get_messages_batch(ids)
+    assert sizes == [20, 20, 10]
+    assert [m["id"] for m in out] == ids
+    assert sleeps == []
+
+
+def test_gmail_batch_fetch_retries_refused_items_once(monkeypatch):
+    refused_once = {"m3", "m7"}
+
+    def answer(i):
+        if i in refused_once:
+            refused_once.discard(i)
+            return _http_error(429)
+        return {"id": i, "snippet": "ok"}
+
+    api, sizes, sleeps = _gmail_api_with_batch(monkeypatch, answer)
+    out = api.get_messages_batch([f"m{n}" for n in range(10)])
+    assert sizes == [10, 2]
+    assert len(sleeps) == 1 and sleeps[0] >= 1.0
+    assert all("error" not in m for m in out)
+
+
+def test_gmail_batch_fetch_keeps_the_error_of_an_item_still_refused(monkeypatch):
+    def answer(i):
+        return _http_error(429) if i == "m1" else _http_error(404) if i == "m2" else {"id": i}
+
+    api, sizes, _ = _gmail_api_with_batch(monkeypatch, answer)
+    out = api.get_messages_batch(["m0", "m1", "m2"])
+    assert sizes == [3, 1]  # only the 429 is retried; a 404 will not change
+    assert out[0] == {"id": "m0"}
+    assert out[1]["id"] == "m1" and "429" in out[1]["error"]
+    assert out[2]["id"] == "m2" and "404" in out[2]["error"]
+
+
+def test_gmail_search_record_keeps_a_fetch_error():
+    from google_workspace_mcp.gmail.changes_api import project_message_record
+
+    record = project_message_record({"id": "m1", "error": "HTTP 429: Too many", "account": "a"})
+    assert record == {"id": "m1", "error": "HTTP 429: Too many", "account": "a"}

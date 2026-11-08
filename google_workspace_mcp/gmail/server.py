@@ -77,8 +77,9 @@ def search_messages(
 ) -> dict:
     """Search messages; each is a short record (subject, from, to, cc, date, snippet, labels).
 
-    get_message returns a message's body. Pass page_token from a previous
-    response's next_page_token to continue.
+    get_message returns a message's body. A message Gmail would not return holds
+    only `id` and `error`. Pass page_token from a previous response's
+    next_page_token to continue.
     """
     api, resolved = _api(account)
     page = run_tool(
@@ -105,7 +106,8 @@ def search_messages_all_accounts(
     """Search messages in every configured account (or only `accounts`) and merge them, newest first.
 
     Each message is a short record, as search_messages returns, with an `account`
-    key; get_message returns a message's body. An account that fails is listed under
+    key; get_message returns a message's body. A message Gmail would not return holds
+    only `id`, `error` and `account`. An account that fails is listed under
     `errors`; the others still return. Use search_messages to page one account.
     """
     results, errors = fan_out(

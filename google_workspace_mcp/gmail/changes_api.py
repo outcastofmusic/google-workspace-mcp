@@ -2,14 +2,25 @@
 from __future__ import annotations
 
 import base64
+import random
 import re
+import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, getaddresses
 from html import unescape
 
 from gmail_cli.api import GmailAPI
+from gmail_cli.retry import with_retry
 from googleapiclient.errors import HttpError
+
+# Gmail refuses a request over its per-user concurrent limit with 429 "Too many
+# concurrent requests for user". Google publishes no number for that limit; its
+# handle-errors guide says not to send batches larger than 50 and to retry at least
+# one second after the error. On 2026-11-08 a batch of 50 had 17/50 refused and
+# batches of 20 had 0/50.
+_BATCH_CHUNK = 20
+_RETRY_DELAY = 1.0
 
 _HISTORY_EXPIRED = (
     "start_history_token expired or invalid; call get_changes_start_token for a "
@@ -144,8 +155,14 @@ def project_message_record(message):
 
     Gmail's metadata resource carries every header (34 on a typical message:
     Received, DKIM, ARC), about 7,500 characters; ten of them overflowed a
-    client's 50,000-character result cap.
+    client's 50,000-character result cap. A message the batch fetch could not
+    get keeps its id and error.
     """
+    if "error" in message:
+        failed = {"id": message.get("id"), "error": message["error"]}
+        if "account" in message:
+            failed["account"] = message["account"]
+        return failed
     headers = (message.get("payload") or {}).get("headers")
     record = {
         "id": message.get("id"),
@@ -163,6 +180,12 @@ def project_message_record(message):
     if "account" in message:
         record["account"] = message["account"]
     return record
+
+
+def _fetch_error(exc):
+    if isinstance(exc, HttpError):
+        return f"HTTP {exc.resp.status}: {exc.reason}"
+    return str(exc)
 
 
 def address_header(value):
@@ -251,6 +274,47 @@ class GmailChangesAPI(GmailAPI):
             ).execute()
         except HttpError as error:
             raise Exception(f"Failed to create draft reply: {error}")
+
+    def _batch_get(self, message_ids, format):
+        """Get messages in batches of _BATCH_CHUNK: ({id: message}, {id: exception})."""
+        fetched, failed = {}, {}
+
+        def callback(request_id, response, exception):
+            if exception:
+                failed[request_id] = exception
+            else:
+                fetched[request_id] = response
+
+        for start in range(0, len(message_ids), _BATCH_CHUNK):
+            batch = self.service.new_batch_http_request()
+            for msg_id in message_ids[start:start + _BATCH_CHUNK]:
+                batch.add(
+                    self.service.users().messages().get(userId=self.user_id, id=msg_id, format=format),
+                    callback=callback,
+                    request_id=msg_id,
+                )
+            batch.execute()
+        return fetched, failed
+
+    @with_retry()
+    def get_messages_batch(self, message_ids, format="metadata"):
+        """Upstream's batch fetch, chunked, with refused (429) items retried once.
+
+        A message that still fails comes back as {"id", "error"}.
+        """
+        fetched, failed = self._batch_get(list(message_ids), format)
+        refused = [i for i, exc in failed.items() if isinstance(exc, HttpError) and exc.resp.status == 429]
+        if refused:
+            time.sleep(_RETRY_DELAY + random.random())
+            retried, still_failed = self._batch_get(refused, format)
+            for msg_id in refused:
+                del failed[msg_id]
+            fetched.update(retried)
+            failed.update(still_failed)
+        return [
+            fetched[i] if i in fetched else {"id": i, "error": _fetch_error(failed[i])}
+            for i in message_ids
+        ]
 
     def _fetch_attachment_data(self, message_id, attachment_id):
         result = self.service.users().messages().attachments().get(
