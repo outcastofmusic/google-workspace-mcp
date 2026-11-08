@@ -428,7 +428,7 @@ def copy_file(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True, open_world=True, core=True)
+@register(mcp, mutating=True, destructive=True, open_world=True, core=True, sends_or_deletes=True)
 def share_file(
     account: str | None = None,
     *,
@@ -449,7 +449,7 @@ def share_file(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def unshare_file(
     account: str | None = None,
     *,
@@ -468,7 +468,7 @@ def unshare_file(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, core=True)
+@register(mcp, mutating=True, core=True, sends_or_deletes=True)
 def trash_file(account: str | None = None, *, file_id: str) -> dict:
     """Move a file to trash (reversible from the Drive UI)."""
     api, resolved = _api(account)
@@ -476,7 +476,7 @@ def trash_file(account: str | None = None, *, file_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True)
+@register(mcp, mutating=True, sends_or_deletes=True)
 def untrash_file(account: str | None = None, *, file_id: str) -> dict:
     """Restore a file from trash."""
     api, resolved = _api(account)
@@ -484,7 +484,7 @@ def untrash_file(account: str | None = None, *, file_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def delete_file(account: str | None = None, *, file_id: str) -> dict:
     """Permanently delete a file (cannot be undone)."""
     api, resolved = _api(account)
@@ -521,7 +521,7 @@ def reply_to_comment(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def delete_comment(account: str | None = None, *, file_id: str, comment_id: str) -> dict:
     """Delete a Drive discussion thread."""
     api, resolved = _api(account)
@@ -580,7 +580,7 @@ def batch_create_folders(account: str | None = None, *, items: list) -> dict:
     return _batch_envelope(resolved, data)
 
 
-@register(mcp, mutating=True)
+@register(mcp, mutating=True, sends_or_deletes=True)
 def batch_trash_files(account: str | None = None, *, file_ids: list) -> dict:
     """Trash many files in one call (reversible). file_ids=[...].
 
@@ -592,7 +592,7 @@ def batch_trash_files(account: str | None = None, *, file_ids: list) -> dict:
     return _batch_envelope(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def batch_delete_files(account: str | None = None, *, file_ids: list) -> dict:
     """Permanently delete many files in one call. file_ids=[...].
 

@@ -374,6 +374,14 @@ Set `GOOGLE_MCP_READONLY=1` in a server's environment to hide every mutating
 tool (writes, deletes, clears) from that server. Destructive tools are also
 clearly marked in their descriptions.
 
+Set `GOOGLE_MCP_NO_SEND_DELETE=1` to hide only the tools that send, draft,
+trash, delete, mark spam, change filters, block senders, rename labels, or share
+files: 21 Gmail tools and 8 Drive tools. Labelling, archiving, moving, uploading
+and creating folders stay listed. Like `GOOGLE_MCP_READONLY`, it is read once at
+startup. It fails closed: any value other than empty, `0`, `false`, `no` or `off`
+hides the tools. While it is on, `modify_labels` and `batch_modify_labels`
+refuse the `TRASH` and `SPAM` labels, so the label tools cannot trash mail either.
+
 Every tool advertises MCP-native `ToolAnnotations` (`readOnlyHint`,
 `destructiveHint`) in `list_tools`, derived from the same flags that drive the
 read-only gate. Annotations are hints for well-behaved clients (auto-allow reads,

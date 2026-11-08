@@ -26,12 +26,17 @@ from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from . import policy, scope
 
 
-def _readonly() -> bool:
-    return os.getenv("GOOGLE_MCP_READONLY", "").strip().lower() in ("1", "true", "yes", "on")
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 # Evaluated once at import; servers are launched with the env already set.
-READONLY = _readonly()
+READONLY = _env_flag("GOOGLE_MCP_READONLY")
+# Hides only the tools tagged sends_or_deletes (send, draft, trash, delete,
+# spam, filters, share), so a server keeps its other writes. Read once, like READONLY.
+# It fails closed: once set, only an explicit off value lists the tools, so a typo
+# such as "2" or "ture" keeps them hidden.
+NO_SEND_DELETE = os.getenv("GOOGLE_MCP_NO_SEND_DELETE", "").strip().lower() not in ("", "0", "false", "no", "off")
 
 # "core" registers only tools tagged core=True; anything else means all tools.
 # Read once at import, like READONLY.
@@ -612,6 +617,7 @@ def register(
     open_world: bool = False,
     core: bool = False,
     drive_scoped: bool = False,
+    sends_or_deletes: bool = False,
 ):
     """Decorator that registers a tool, honoring the read-only gate and
     attaching MCP ToolAnnotations derived from the same flags.
@@ -619,7 +625,8 @@ def register(
     Mutating tools are not registered at all when ``GOOGLE_MCP_READONLY`` is set,
     so they never appear in ``list_tools``. Destructive tools get a clear marker
     appended to their description. With ``GOOGLE_MCP_TOOLSET=core`` only tools
-    tagged ``core=True`` are registered.
+    tagged ``core=True`` are registered. With ``GOOGLE_MCP_NO_SEND_DELETE`` set,
+    tools tagged ``sends_or_deletes=True`` are not registered.
 
     ``drive_scoped`` (set by the Drive, Docs, Sheets and Slides servers) makes a client
     scope's ``drive_folders`` limit the files the tool names, creates and lists.
@@ -631,6 +638,8 @@ def register(
         declared_tools.setdefault(id(mcp), set()).add(fn.__name__)
         if mutating and READONLY:
             return fn  # skip registration entirely
+        if sends_or_deletes and NO_SEND_DELETE:
+            return fn
         if TOOLSET == "core" and not core:
             return fn
         if destructive and fn.__doc__:

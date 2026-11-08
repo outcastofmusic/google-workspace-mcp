@@ -19,6 +19,7 @@ from ..core import (
 )
 from ..core.fanout import fan_out, merged, tag
 from ..core.paths import free_path, safe_dir, safe_path, safe_paths
+from ..core.runtime import NO_SEND_DELETE
 from .changes_api import GmailChangesAPI, project_message_record
 
 mcp = build_server(
@@ -381,7 +382,7 @@ def list_changes(
 # WRITE tools (mutating=True)
 # ---------------------------------------------------------------------------
 
-@register(mcp, mutating=True, destructive=True, open_world=True, core=True)
+@register(mcp, mutating=True, destructive=True, open_world=True, core=True, sends_or_deletes=True)
 def send_message(
     account: str | None = None,
     *,
@@ -404,7 +405,7 @@ def send_message(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True, open_world=True, core=True)
+@register(mcp, mutating=True, destructive=True, open_world=True, core=True, sends_or_deletes=True)
 def reply_to_message(
     account: str | None = None,
     *,
@@ -423,7 +424,7 @@ def reply_to_message(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, core=True)
+@register(mcp, mutating=True, core=True, sends_or_deletes=True)
 def draft_reply(
     account: str | None = None,
     *,
@@ -445,7 +446,7 @@ def draft_reply(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True, open_world=True, core=True)
+@register(mcp, mutating=True, destructive=True, open_world=True, core=True, sends_or_deletes=True)
 def forward_message(
     account: str | None = None,
     *,
@@ -463,7 +464,7 @@ def forward_message(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, core=True)
+@register(mcp, mutating=True, core=True, sends_or_deletes=True)
 def create_draft(
     account: str | None = None,
     to: str = "",
@@ -484,7 +485,7 @@ def create_draft(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True)
+@register(mcp, mutating=True, sends_or_deletes=True)
 def update_draft(
     account: str | None = None,
     *,
@@ -510,7 +511,7 @@ def update_draft(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True, open_world=True, core=True)
+@register(mcp, mutating=True, destructive=True, open_world=True, core=True, sends_or_deletes=True)
 def send_draft(account: str | None = None, *, draft_id: str) -> dict:
     """Send an existing draft, completing the draft -> review -> send loop.
 
@@ -522,6 +523,19 @@ def send_draft(account: str | None = None, *, draft_id: str) -> dict:
     return ok(resolved, data)
 
 
+# Under GOOGLE_MCP_NO_SEND_DELETE the trash and spam tools are unlisted, but adding
+# or removing the TRASH or SPAM system label does the same through the label tools.
+_TRASH_SPAM = {"TRASH", "SPAM"}
+
+
+def _refuse_trash_spam(*label_lists: list[str] | None) -> None:
+    if not NO_SEND_DELETE:
+        return
+    named = {label.upper() for labels in label_lists for label in labels or ()}
+    if named & _TRASH_SPAM:
+        raise ValueError("TRASH and SPAM labels are refused while GOOGLE_MCP_NO_SEND_DELETE is set")
+
+
 @register(mcp, mutating=True, core=True)
 def modify_labels(
     account: str | None = None,
@@ -531,6 +545,7 @@ def modify_labels(
     remove_label_ids: list[str] | None = None,
 ) -> dict:
     """Add or remove labels on a message."""
+    _refuse_trash_spam(add_label_ids, remove_label_ids)
     api, resolved = _api(account)
     data = run_tool(lambda: api.modify_message(message_id, add_label_ids=add_label_ids, remove_label_ids=remove_label_ids))
     return ok(resolved, data)
@@ -568,7 +583,7 @@ def unstar_message(account: str | None = None, *, message_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True)
+@register(mcp, mutating=True, sends_or_deletes=True)
 def mark_as_spam(account: str | None = None, *, message_id: str) -> dict:
     """Mark a message as spam (adds SPAM label, removes INBOX)."""
     api, resolved = _api(account)
@@ -576,7 +591,7 @@ def mark_as_spam(account: str | None = None, *, message_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True)
+@register(mcp, mutating=True, sends_or_deletes=True)
 def unmark_spam(account: str | None = None, *, message_id: str) -> dict:
     """Remove spam marking from a message (removes SPAM label, restores INBOX)."""
     api, resolved = _api(account)
@@ -598,7 +613,7 @@ def create_label(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True)
+@register(mcp, mutating=True, sends_or_deletes=True)
 def update_label(
     account: str | None = None,
     *,
@@ -613,7 +628,7 @@ def update_label(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True, open_world=True)
+@register(mcp, mutating=True, destructive=True, open_world=True, sends_or_deletes=True)
 def create_filter(
     account: str | None = None,
     *,
@@ -626,7 +641,7 @@ def create_filter(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def block_sender(account: str | None = None, *, email: str) -> dict:
     """Block a sender by creating a filter that marks their emails as spam."""
     api, resolved = _api(account)
@@ -643,6 +658,7 @@ def batch_modify_labels(
     remove_label_ids: list[str] | None = None,
 ) -> dict:
     """Add or remove labels on multiple messages in a single batch operation."""
+    _refuse_trash_spam(add_label_ids, remove_label_ids)
     api, resolved = _api(account)
     data = run_tool(lambda: api.batch_modify_messages(message_ids, add_label_ids=add_label_ids, remove_label_ids=remove_label_ids))
     return ok(resolved, data)
@@ -652,7 +668,7 @@ def batch_modify_labels(
 # DESTRUCTIVE tools (mutating=True, destructive=True)
 # ---------------------------------------------------------------------------
 
-@register(mcp, mutating=True, destructive=True, core=True)
+@register(mcp, mutating=True, destructive=True, core=True, sends_or_deletes=True)
 def trash_message(account: str | None = None, *, message_id: str) -> dict:
     """Move a message to trash (can be recovered with untrash_message)."""
     api, resolved = _api(account)
@@ -660,7 +676,7 @@ def trash_message(account: str | None = None, *, message_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def untrash_message(account: str | None = None, *, message_id: str) -> dict:
     """Restore a message from trash back to the inbox."""
     api, resolved = _api(account)
@@ -668,7 +684,7 @@ def untrash_message(account: str | None = None, *, message_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def delete_message(account: str | None = None, *, message_id: str) -> dict:
     """Permanently delete a message (cannot be undone; use trash_message to recover later)."""
     api, resolved = _api(account)
@@ -676,7 +692,7 @@ def delete_message(account: str | None = None, *, message_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def delete_label(account: str | None = None, *, label_id: str) -> dict:
     """Permanently delete a label from the mailbox."""
     api, resolved = _api(account)
@@ -684,7 +700,7 @@ def delete_label(account: str | None = None, *, label_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def delete_draft(account: str | None = None, *, draft_id: str) -> dict:
     """Permanently delete a draft (e.g. to clean up a superseded one)."""
     api, resolved = _api(account)
@@ -692,7 +708,7 @@ def delete_draft(account: str | None = None, *, draft_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def delete_filter(account: str | None = None, *, filter_id: str) -> dict:
     """Permanently delete a Gmail filter."""
     api, resolved = _api(account)
@@ -700,7 +716,7 @@ def delete_filter(account: str | None = None, *, filter_id: str) -> dict:
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def batch_trash_messages(
     account: str | None = None,
     *,
@@ -712,7 +728,7 @@ def batch_trash_messages(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def batch_untrash_messages(
     account: str | None = None,
     *,
@@ -724,7 +740,7 @@ def batch_untrash_messages(
     return ok(resolved, data)
 
 
-@register(mcp, mutating=True, destructive=True)
+@register(mcp, mutating=True, destructive=True, sends_or_deletes=True)
 def batch_delete_messages(
     account: str | None = None,
     *,

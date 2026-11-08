@@ -85,11 +85,12 @@ Key invariants, all enforced by `core/runtime.py` — do not bypass them:
 `@register` (in `core/runtime.py`) is the only way to register a tool, and its flags drive two behaviors:
 
 - `mutating=True` — the tool is **not registered at all** when `GOOGLE_MCP_READONLY` env is set (`1/true/yes/on`). It never appears in `list_tools`. Read tools use bare `@register(mcp)`.
+- `sends_or_deletes=True` — the tool is **not registered** when `GOOGLE_MCP_NO_SEND_DELETE` is set. Tag every tool that sends, drafts, trashes, untrashes, deletes, marks spam, changes filters, blocks a sender, renames a label, or shares or unshares a file; the tagged sets are pinned by `test_no_send_delete_hides_tagged_tools` in `tests/test_integration.py`.
 - `destructive=True` — appends a `[DESTRUCTIVE]` warning to the tool's docstring/description. Deletes, clears, and permanent changes use `mutating=True, destructive=True`.
 
 Mutating calls also pass `core/policy.py` (recipient allowlist, required/read-only accounts, audit log): recipient checks run in `register`'s wrapper, account checks in `get_api`. Policy env vars are read at call time; see the README's "Safety policy" section.
 
-`READONLY` is read once at import, so servers must be launched with the env already set. When adding a write/delete tool, set these flags or it will leak into read-only mode.
+`READONLY` and `NO_SEND_DELETE` are read once at import, so servers must be launched with the env already set. When adding a write/delete tool, set these flags or it will leak into read-only mode.
 
 ## Client scope
 

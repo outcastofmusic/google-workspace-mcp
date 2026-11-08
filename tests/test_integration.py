@@ -264,7 +264,7 @@ def _tool_names(pkg, env):
 def _base_env():
     return {
         k: v for k, v in os.environ.items()
-        if k not in ("GOOGLE_MCP_READONLY", "GOOGLE_MCP_TOOLSET")
+        if k not in ("GOOGLE_MCP_READONLY", "GOOGLE_MCP_TOOLSET", "GOOGLE_MCP_NO_SEND_DELETE")
     }
 
 
@@ -287,6 +287,67 @@ def test_core_toolset_combines_with_readonly():
     names = _tool_names("gmail", env)
     assert {"list_messages", "get_message"} <= names
     assert not names & {"send_message", "trash_message", "list_changes"}
+
+
+_SENDS_OR_DELETES = {
+    "gmail": {
+        "send_message", "reply_to_message", "forward_message", "draft_reply", "create_draft",
+        "update_draft", "send_draft", "delete_draft", "trash_message", "untrash_message",
+        "delete_message", "batch_trash_messages", "batch_untrash_messages",
+        "batch_delete_messages", "mark_as_spam", "unmark_spam", "update_label", "delete_label",
+        "create_filter", "delete_filter", "block_sender",
+    },
+    "drive": {
+        "share_file", "unshare_file", "trash_file", "untrash_file", "delete_file",
+        "batch_trash_files", "batch_delete_files", "delete_comment",
+    },
+}
+_KEPT_WRITES = {
+    "gmail": {"modify_labels", "batch_modify_labels", "archive_message", "create_label"},
+    "drive": {"move_file", "create_folder", "upload_file"},
+}
+
+
+@pytest.mark.parametrize("pkg", sorted(_SENDS_OR_DELETES))
+def test_no_send_delete_hides_tagged_tools(pkg):
+    """GOOGLE_MCP_NO_SEND_DELETE=1 unlists exactly the tagged tools and keeps the other writes."""
+    without = _tool_names(pkg, _base_env())
+    with_flag = _tool_names(pkg, {**_base_env(), "GOOGLE_MCP_NO_SEND_DELETE": "1"})
+    assert without - with_flag == _SENDS_OR_DELETES[pkg]
+    assert with_flag <= without
+    assert _KEPT_WRITES[pkg] <= with_flag
+
+
+@pytest.mark.parametrize("value", ["2", "ture", " ON "])
+def test_no_send_delete_fails_closed_on_unknown_values(value):
+    """A value that is not an explicit off value keeps the tagged tools hidden."""
+    names = _tool_names("gmail", {**_base_env(), "GOOGLE_MCP_NO_SEND_DELETE": value})
+    assert not names & _SENDS_OR_DELETES["gmail"]
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "No", "off"])
+def test_no_send_delete_off_values_list_tagged_tools(value):
+    names = _tool_names("gmail", {**_base_env(), "GOOGLE_MCP_NO_SEND_DELETE": value})
+    assert _SENDS_OR_DELETES["gmail"] <= names
+
+
+@pytest.mark.parametrize("call", [
+    'server.modify_labels(message_id="m1", add_label_ids=["TRASH"])',
+    'server.modify_labels(message_id="m1", add_label_ids=["spam"])',
+    'server.batch_modify_labels(message_ids=["m1"], remove_label_ids=["TRASH"])',
+])
+def test_no_send_delete_refuses_trash_and_spam_labels(call):
+    """Adding TRASH or SPAM through the label tools would trash mail past the flag."""
+    code = (
+        "from google_workspace_mcp.gmail import server\n"
+        "try:\n"
+        f"    {call}\n"
+        "except ValueError as e:\n"
+        "    print('refused', e)\n"
+    )
+    env = {**_base_env(), "GOOGLE_MCP_NO_SEND_DELETE": "1"}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
+    assert out.stdout.startswith("refused"), out.stdout + out.stderr
 
 
 def test_unknown_toolset_warns_and_registers_all():
