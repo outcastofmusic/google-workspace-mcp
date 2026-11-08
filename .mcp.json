@@ -2,7 +2,7 @@
   "mcpServers": {
     "google-workspace": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.11.0", "gworkspace-mcp"]
+      "args": ["--from", "git+https://github.com/outcastofmusic/google-workspace-mcp@v0.12.0", "gworkspace-mcp"]
     }
   }
 }
