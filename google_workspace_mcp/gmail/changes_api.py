@@ -223,6 +223,20 @@ class GmailChangesAPI(GmailAPI):
     def forward_message(self, message_id, to, body=None, attachments=None):
         return super().forward_message(message_id, address_header(to), body=body, attachments=attachments)
 
+    # gmail-cli-oauth 1.6.1 sends the label as body={"label": {...}}, and Gmail answers every
+    # such create or update with 400 "Invalid request". The Label resource is the body itself.
+    def create_label(self, name, message_list_visibility="show", label_list_visibility="labelShow", color=None):
+        body = {"name": name, "messageListVisibility": message_list_visibility, "labelListVisibility": label_list_visibility}
+        if color:
+            body["color"] = color
+        return self.service.users().labels().create(userId=self.user_id, body=body).execute()
+
+    def update_label(self, label_id, name=None, message_list_visibility=None, label_list_visibility=None, color=None):
+        fields = {"name": name, "messageListVisibility": message_list_visibility,
+                  "labelListVisibility": label_list_visibility, "color": color}
+        body = {key: value for key, value in fields.items() if value is not None}
+        return self.service.users().labels().patch(userId=self.user_id, id=label_id, body=body).execute()
+
     def _build_reply(self, message_id, body, reply_all, additional_cc, attachments):
         # Mirrors upstream reply_to_message/draft_reply, but the recipients are
         # read from the original's headers, so they go through address_header.

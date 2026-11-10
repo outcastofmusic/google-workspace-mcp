@@ -146,6 +146,23 @@ def _gmail_api_with_mock(monkeypatch):
     return api, svc
 
 
+def test_create_label_sends_the_label_as_the_body(monkeypatch):
+    api, svc = _gmail_api_with_mock(monkeypatch)
+    api.create_label("eurycleia-test")
+    svc.users.return_value.labels.return_value.create.assert_called_once_with(
+        userId=api.user_id,
+        body={"name": "eurycleia-test", "messageListVisibility": "show", "labelListVisibility": "labelShow"},
+    )
+
+
+def test_update_label_sends_only_the_fields_given_as_the_body(monkeypatch):
+    api, svc = _gmail_api_with_mock(monkeypatch)
+    api.update_label("Label_7", name="Renamed")
+    svc.users.return_value.labels.return_value.patch.assert_called_once_with(
+        userId=api.user_id, id="Label_7", body={"name": "Renamed"},
+    )
+
+
 def _b64(text: str) -> str:
     return base64.urlsafe_b64encode(text.encode()).decode().rstrip("=")
 
